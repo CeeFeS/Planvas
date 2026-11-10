@@ -39,6 +39,7 @@ import {
   type CustomCellEditTarget,
 } from './custom-column-cell'
 import { ColumnFilter, matchesColumnFilter, type ColumnFilterSelection } from './column-filter'
+import { ResourceColorPicker } from './resource-color-picker'
 import {
   autoTaskColumnWidth,
   autoResourceColumnWidth,
@@ -258,6 +259,7 @@ export function PlanningGrid() {
     moveTaskAsync,
     updateResource,
     updateResourceAsync,
+    setResourceColorAsync,
     deleteTaskAsync,
     deleteResourceAsync,
     createCustomColumnAsync,
@@ -644,13 +646,7 @@ export function PlanningGrid() {
     const allResources = flattenTasksWithChildren(tasksWithData).flatMap(t => t.resources)
     
     // Group by resource name
-    const groupedByName = new Map<string, {
-      name: string
-      allocationsBySlot: Map<string, { total: number; colorData: { color: string; percentage: number }[] }>
-      totalEffort: number
-      startDate: string | null
-      endDate: string | null
-    }>()
+    const groupedByName = new Map<string, ResourceSummary & { resourceColors: Set<string> }>()
 
     for (const resource of allResources) {
       let group = groupedByName.get(resource.name)
@@ -658,6 +654,8 @@ export function PlanningGrid() {
       if (!group) {
         group = {
           name: resource.name,
+          color: null,
+          resourceColors: new Set(),
           allocationsBySlot: new Map(),
           totalEffort: 0,
           startDate: null,
@@ -665,6 +663,7 @@ export function PlanningGrid() {
         }
         groupedByName.set(resource.name, group)
       }
+      if (resource.color_hex) group.resourceColors.add(resource.color_hex)
 
       // Add allocations
       for (const allocation of resource.allocations) {
@@ -693,7 +692,13 @@ export function PlanningGrid() {
       }
     }
 
-    const all = Array.from(groupedByName.values()).sort((a, b) => a.name.localeCompare(b.name))
+    const all: ResourceSummary[] = Array.from(groupedByName.values())
+      .map(({ resourceColors, ...summary }) => ({
+        ...summary,
+        // Only an unambiguous color represents the whole group
+        color: resourceColors.size === 1 ? [...resourceColors][0] : null,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
     // Apply resource filter (null = show all)
     if (resourceFilter === null) return all
     return all.filter((g) => resourceFilter.has(g.name))
@@ -702,6 +707,7 @@ export function PlanningGrid() {
   // The observer itself reacts to height changes, so this only needs to re-run
   // when a header row is (un)mounted - not on every data change.
   const hasSummaryRows = resourceSummaryByName.length > 0
+  const summaryHasColors = resourceSummaryByName.some((s) => s.color !== null)
   useEffect(() => {
     const rows = [gridHeadRow1Ref.current, summaryHeadRow1Ref.current].filter(
       (r): r is HTMLTableRowElement => r != null
@@ -902,6 +908,7 @@ export function PlanningGrid() {
 
     const resource = findResourceInTree(tasksWithData, resourceId)
     const existingAllocation = resource?.allocationMap.get(slotKey)
+    const colorHex = resource?.color_hex || activeBrush.colorHex
     const isSameCell = lastClickedCell.current?.resourceId === resourceId && 
                        lastClickedCell.current?.slotKey === slotKey
 
@@ -910,9 +917,9 @@ export function PlanningGrid() {
       store.removeAllocationAsync(resourceId, slotKey).catch(console.error)
     }
     const paint = () => {
-      store.setAllocation(resourceId, slotKey, activeBrush.percentage, activeBrush.colorHex)
+      store.setAllocation(resourceId, slotKey, activeBrush.percentage, colorHex)
       store
-        .setAllocationAsync(resourceId, slotKey, activeBrush.percentage, activeBrush.colorHex)
+        .setAllocationAsync(resourceId, slotKey, activeBrush.percentage, colorHex)
         .catch(console.error)
     }
 
@@ -932,7 +939,7 @@ export function PlanningGrid() {
 
     if (
       existingAllocation.percentage === activeBrush.percentage &&
-      existingAllocation.color_hex === activeBrush.colorHex
+      existingAllocation.color_hex === colorHex
     ) {
       // Same value as brush -> delete
       remove()
@@ -1083,6 +1090,13 @@ export function PlanningGrid() {
       updateResourceAsync(id, updates).catch(console.error)
     },
     [updateResource, updateResourceAsync]
+  )
+
+  const handleSetResourceColor = useCallback(
+    (id: string, colorHex: string | null, recolorExisting: boolean) => {
+      setResourceColorAsync(id, colorHex, recolorExisting).catch(console.error)
+    },
+    [setResourceColorAsync]
   )
 
   const handleDeleteTask = useCallback(
@@ -1386,6 +1400,7 @@ export function PlanningGrid() {
                 onOutdentTask={handleOutdentTask}
                 onUpdateTask={handleUpdateTask}
                 onUpdateResource={handleUpdateResource}
+                onSetResourceColor={handleSetResourceColor}
                 onDeleteTask={handleDeleteTask}
                 onDeleteResource={handleDeleteResource}
                 taskColumnLeft={taskColumnLeft}
@@ -1634,6 +1649,7 @@ export function PlanningGrid() {
                   <ResourceSummaryRow
                     key={summary.name}
                     summary={summary}
+                    showColorSlot={summaryHasColors}
                     slotKeys={slotKeys}
                     currentSlotKey={currentSlotKey}
                     customColumns={sortedCustomColumns}
@@ -1691,8 +1707,20 @@ function BrushCursor({
 }) {
   const activeBrush = useProjectStore((s) => s.activeBrush)
   const elRef = useRef<HTMLDivElement>(null)
+  const swatchRef = useRef<HTMLDivElement>(null)
   const widthRef = useRef(fixedColumnsWidth)
   widthRef.current = fixedColumnsWidth
+  const brushColorRef = useRef(activeBrush.colorHex)
+  brushColorRef.current = activeBrush.colorHex
+  // Color of a colored resource row under the pointer (it overrides the brush)
+  const hoverColorRef = useRef<string | null>(null)
+
+  // The swatch color is written imperatively, so React must not own it
+  useEffect(() => {
+    if (swatchRef.current) {
+      swatchRef.current.style.backgroundColor = hoverColorRef.current ?? activeBrush.colorHex
+    }
+  }, [activeBrush.colorHex])
 
   useEffect(() => {
     const container = scrollRef.current
@@ -1703,6 +1731,14 @@ function BrushCursor({
     let clientX = 0
     let clientY = 0
     let inside = false
+    const { setHoveredResource } = useProjectStore.getState()
+
+    // Published for the brush bar in the header (the store ignores repeats)
+    const publishHover = (row: HTMLElement | null) => {
+      const color = row?.dataset.resourceColor
+      hoverColorRef.current = color || null
+      setHoveredResource(color ? { color, name: row?.dataset.resourceName ?? '' } : null)
+    }
 
     // Single read-then-write per frame keeps this out of layout thrashing.
     const paint = () => {
@@ -1713,6 +1749,9 @@ function BrushCursor({
           widthRef.current
       el.style.transform = `translate3d(${clientX + 16}px, ${clientY + 16}px, 0)`
       el.style.opacity = overPaintArea ? '1' : '0'
+      if (swatchRef.current) {
+        swatchRef.current.style.backgroundColor = hoverColorRef.current ?? brushColorRef.current
+      }
     }
 
     const schedule = () => {
@@ -1723,11 +1762,13 @@ function BrushCursor({
       clientX = e.clientX
       clientY = e.clientY
       inside = true
+      publishHover((e.target as Element | null)?.closest?.<HTMLElement>('tr[data-resource-color]') ?? null)
       schedule()
     }
 
     const handleLeave = () => {
       inside = false
+      publishHover(null)
       schedule()
     }
 
@@ -1738,6 +1779,7 @@ function BrushCursor({
       container.removeEventListener('mousemove', handleMove)
       container.removeEventListener('mouseleave', handleLeave)
       if (frame) cancelAnimationFrame(frame)
+      setHoveredResource(null)
     }
   }, [scrollRef])
 
@@ -1748,11 +1790,9 @@ function BrushCursor({
       className="fixed left-0 top-0 pointer-events-none z-50 flex items-center gap-1.5 opacity-0"
     >
       <div
+        ref={swatchRef}
         className="w-5 h-5 rounded shadow-md border border-white/50"
-        style={{
-          backgroundColor: activeBrush.colorHex,
-          opacity: percentageToOpacity(activeBrush.percentage),
-        }}
+        style={{ opacity: percentageToOpacity(activeBrush.percentage) }}
       />
       <span className="text-xs font-mono bg-surface/90 px-1.5 py-0.5 rounded shadow-sm text-ink-light">
         {activeBrush.percentage}%
@@ -1802,6 +1842,7 @@ interface TaskRowsProps {
   onOutdentTask: (taskId: string) => void
   onUpdateTask: (id: string, updates: Partial<TaskWithAggregation>) => void
   onUpdateResource: (id: string, updates: Partial<ResourceWithAllocations>) => void
+  onSetResourceColor: (id: string, colorHex: string | null, recolorExisting: boolean) => void
   onDeleteTask: (id: string) => void
   onDeleteResource: (id: string) => void
   taskColumnLeft: number
@@ -1836,6 +1877,7 @@ function TaskRowsComponent({
   onOutdentTask,
   onUpdateTask,
   onUpdateResource,
+  onSetResourceColor,
   onDeleteTask,
   onDeleteResource,
   taskColumnLeft,
@@ -2210,6 +2252,7 @@ function TaskRowsComponent({
                 onOutdentTask={onOutdentTask}
                 onUpdateTask={onUpdateTask}
                 onUpdateResource={onUpdateResource}
+                onSetResourceColor={onSetResourceColor}
                 onDeleteTask={onDeleteTask}
                 onDeleteResource={onDeleteResource}
                 taskColumnLeft={taskColumnLeft}
@@ -2292,6 +2335,7 @@ function TaskRowsComponent({
               onCellMouseDown={onCellMouseDown}
               onCellMouseEnter={onCellMouseEnter}
               onUpdateResource={onUpdateResource}
+              onSetResourceColor={onSetResourceColor}
               onDeleteResource={onDeleteResource}
               taskColumnLeft={taskColumnLeft}
               taskColumnWidth={taskColumnWidth}
@@ -2323,8 +2367,10 @@ function TaskRowsComponent({
                 className="planvas-freeze-edge sticky bg-surface z-20 border-r border-paper-lines px-3 py-1 overflow-hidden"
                 style={{ left: resourceColumnLeft, width: resourceColumnWidth }}
               >
-                <div className={cn('flex items-center gap-2 min-w-0', isSubtask ? 'pl-6' : 'pl-4')}>
-                  <Plus size={12} className="text-ink-faded flex-shrink-0" />
+                <div className={cn('flex items-center gap-2 min-w-0', isSubtask && 'pl-2')}>
+                  <span className="resource-color-trigger" aria-hidden>
+                    <Plus size={12} className="text-ink-faded" />
+                  </span>
                   <input
                     type="text"
                     value={newResourceName}
@@ -2374,6 +2420,7 @@ interface ResourceRowProps {
   onCellMouseDown: (resourceId: string, slotKey: string) => void
   onCellMouseEnter: (resourceId: string, slotKey: string) => void
   onUpdateResource: (id: string, updates: Partial<ResourceWithAllocations>) => void
+  onSetResourceColor: (id: string, colorHex: string | null, recolorExisting: boolean) => void
   onDeleteResource: (id: string) => void
   taskColumnLeft: number
   taskColumnWidth: number
@@ -2399,6 +2446,7 @@ function ResourceRowComponent({
   onCellMouseDown,
   onCellMouseEnter,
   onUpdateResource,
+  onSetResourceColor,
   onDeleteResource,
   taskColumnLeft,
   taskColumnWidth,
@@ -2461,9 +2509,17 @@ function ResourceRowComponent({
       }
     : undefined
 
+  const handleColorChange = useCallback(
+    (colorHex: string | null, recolorExisting: boolean) =>
+      onSetResourceColor(resource.id, colorHex, recolorExisting),
+    [onSetResourceColor, resource.id]
+  )
+
   return (
     <tr
       className="hover:bg-paper-warm/20 group"
+      data-resource-color={resource.color_hex || undefined}
+      data-resource-name={resource.color_hex ? resource.name : undefined}
       onMouseDown={handleRowMouseDown}
       onMouseOver={handleRowMouseOver}
     >
@@ -2484,7 +2540,13 @@ function ResourceRowComponent({
         className="planvas-freeze-edge sticky bg-surface z-20 border-r border-paper-lines px-3 py-1.5 overflow-hidden"
         style={{ left: resourceColumnLeft, width: resourceColumnWidth }}
       >
-        <div className={cn('flex items-center gap-2 min-w-0', indent ? 'pl-6' : 'pl-4')}>
+        <div className={cn('flex items-center gap-2 min-w-0', indent && 'pl-2')}>
+          <ResourceColorPicker
+            color={resource.color_hex}
+            resourceName={resource.name}
+            canEdit={canEdit && !resource.id.startsWith('temp_')}
+            onChange={handleColorChange}
+          />
           {isEditing && canEdit ? (
             <input
               type="text"
@@ -2609,14 +2671,20 @@ const ResourceRow = memo(ResourceRowComponent)
 
 // ==================== Resource Summary Row Component ====================
 
+interface ResourceSummary {
+  name: string
+  /** Shared color of all same-named resources, null if none or mixed */
+  color: string | null
+  allocationsBySlot: Map<string, { total: number; colorData: { color: string; percentage: number }[] }>
+  totalEffort: number
+  startDate: string | null
+  endDate: string | null
+}
+
 interface ResourceSummaryRowProps {
-  summary: {
-    name: string
-    allocationsBySlot: Map<string, { total: number; colorData: { color: string; percentage: number }[] }>
-    totalEffort: number
-    startDate: string | null
-    endDate: string | null
-  }
+  summary: ResourceSummary
+  /** Reserve the color slot so names stay aligned when some rows have a color */
+  showColorSlot: boolean
   slotKeys: string[]
   currentSlotKey: string
   customColumns: CustomColumn[]
@@ -2630,6 +2698,7 @@ interface ResourceSummaryRowProps {
 
 function ResourceSummaryRowComponent({
   summary,
+  showColorSlot,
   slotKeys,
   currentSlotKey,
   customColumns,
@@ -2700,6 +2769,16 @@ function ResourceSummaryRowComponent({
         style={{ left: 0, width: summaryColumnWidth }}
       >
         <div className="flex items-center gap-2 min-w-0">
+          {showColorSlot && (
+            <span
+              className="resource-color-trigger"
+              title={summary.color ? `${t('grid', 'resourceColor')}: ${summary.color}` : undefined}
+            >
+              {summary.color && (
+                <span className="resource-color-dot" style={{ backgroundColor: summary.color }} />
+              )}
+            </span>
+          )}
           <span className={cn(
             'text-sm font-medium truncate',
             hasOverallocation ? 'text-red-600' : hasUnderallocation ? 'text-amber-600' : 'text-ink'

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Paintbrush, ChevronDown, Check, Plus, X, Save } from 'lucide-react'
-import { useProjectStore } from '@/store/project-store'
+import { useProjectStore, useProjectActions } from '@/store/project-store'
 import { useTranslation } from '@/lib/language-context'
 import { MAX_PERCENTAGE_PRESETS, MAX_CUSTOM_COLORS, COLOR_PALETTE } from '@/lib/types'
 import { useBrushPreferences, normalizeHexColor } from '@/lib/use-brush-preferences'
@@ -29,7 +29,9 @@ function indexFromHotkey(key: string): number | null {
 }
 
 export function BrushEditor() {
-  const { activeBrush, setActiveBrush } = useProjectStore()
+  const activeBrush = useProjectStore((s) => s.activeBrush)
+  const hoveredResource = useProjectStore((s) => s.hoveredResource)
+  const { setActiveBrush } = useProjectActions()
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const {
@@ -227,12 +229,18 @@ export function BrushEditor() {
 
   const canAddMore = percentages.length < MAX_PERCENTAGE_PRESETS
 
-  const chipStyle = (percentage: number): CSSProperties => ({
-    '--chip-color': baseColor,
+  const chipStyle = (percentage: number, color = baseColor): CSSProperties => ({
+    '--chip-color': color,
     '--chip-opacity': percentageToOpacity(percentage),
   } as CSSProperties)
 
   const labelColor = getContrastTextColor(baseColor)
+  // The bar previews what a click would paint: a colored resource row wins
+  const barColor = hoveredResource?.color ?? baseColor
+  const barLabelColor = getContrastTextColor(barColor)
+  const barTitle = hoveredResource
+    ? t('grid', 'brushUsesResourceColor').replace('{name}', hoveredResource.name)
+    : t('brush', 'settingsTooltip')
 
   return (
     <div ref={brushBarRef} className="brush-bar relative">
@@ -243,7 +251,7 @@ export function BrushEditor() {
           setIsEditingPercentage(false)
         }}
         className="brush-bar-color"
-        title={t('brush', 'settingsTooltip')}
+        title={barTitle}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
       >
@@ -251,7 +259,7 @@ export function BrushEditor() {
         <span
           className="brush-bar-swatch"
           style={{
-            backgroundColor: baseColor,
+            backgroundColor: barColor,
             opacity: percentageToOpacity(activeBrush.percentage),
           }}
         />
@@ -319,9 +327,9 @@ export function BrushEditor() {
                   'brush-value-chip',
                   isActive && 'brush-value-chip-active'
                 )}
-                style={chipStyle(percentage)}
+                style={chipStyle(percentage, barColor)}
               >
-                <span className="brush-value-label" style={{ color: labelColor }}>
+                <span className="brush-value-label" style={{ color: barLabelColor }}>
                   {percentage}
                 </span>
               </button>
@@ -334,9 +342,9 @@ export function BrushEditor() {
               onClick={startEditingPercentage}
               title={t('brush', 'editPercentageHint')}
               className="brush-value-chip brush-value-chip-active"
-              style={chipStyle(activeBrush.percentage)}
+              style={chipStyle(activeBrush.percentage, barColor)}
             >
-              <span className="brush-value-label" style={{ color: labelColor }}>
+              <span className="brush-value-label" style={{ color: barLabelColor }}>
                 {activeBrush.percentage}
               </span>
             </button>
@@ -583,6 +591,8 @@ export function BrushEditor() {
               {t('brush', 'keyboardHints')}
               <br />
               {t('brush', 'syncedHint')}
+              <br />
+              {t('brush', 'resourceColorHint')}
             </p>
           </div>
         </>
@@ -597,7 +607,7 @@ interface ColorSwatchProps {
   onSelect: () => void
 }
 
-function ColorSwatch({ color, isActive, onSelect }: ColorSwatchProps) {
+export function ColorSwatch({ color, isActive, onSelect }: ColorSwatchProps) {
   return (
     <button
       type="button"

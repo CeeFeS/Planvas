@@ -705,6 +705,51 @@ body {
   border-color: var(--ink-red);
 }
 
+/* ==================== Resource color ==================== */
+/* Fixed slot in front of resource names (rows use gap-2; the negative margin
+   pulls the name to 4px), so names line up with or without a color. */
+.resource-color-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: -4px;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+.resource-color-trigger-editable {
+  cursor: pointer;
+  transition: background 0.12s ease, opacity 0.12s ease;
+}
+
+.resource-color-trigger-editable:hover {
+  background: var(--paper-lines);
+}
+
+.resource-color-trigger-unset {
+  opacity: 0;
+}
+
+.group:hover .resource-color-trigger-unset,
+.resource-color-trigger-unset:focus-visible {
+  opacity: 1;
+}
+
+.resource-color-dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.resource-color-dot-empty {
+  box-shadow: none;
+  border: 1px dashed var(--ink-faded);
+}
+
 .brush-chip {
   width: 24px;
   height: 24px;

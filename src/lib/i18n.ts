@@ -308,6 +308,17 @@ export const translations = {
     filterNoMatches: { de: 'Keine Treffer', en: 'No matches' },
     filterNoRows: { de: 'Keine Einträge entsprechen den aktiven Filtern.', en: 'No entries match the active filters.' },
     autoWidthHint: { de: 'Ziehen: Breite ändern · Doppelklick: automatische Breite', en: 'Drag: resize · Double-click: auto width' },
+    resourceColor: { de: 'Ressourcenfarbe', en: 'Resource color' },
+    setResourceColor: { de: 'Farbe für diese Ressource festlegen', en: 'Set a color for this resource' },
+    resourceColorNone: { de: 'Pinselfarbe verwenden', en: 'Use brush color' },
+    resourceColorHint: {
+      de: 'Gilt für alle Ressourcen mit diesem Namen. Neue Zuweisungen werden in dieser Farbe gemalt – unabhängig von der Grundfarbe des Pinsels.',
+      en: 'Applies to every resource with this name. New allocations are painted in this color, whatever the brush base color is.',
+    },
+    resourceColorShared: { de: '„{name}“ kommt {count}× im Projekt vor.', en: '“{name}” appears {count}× in this project.' },
+    brushUsesResourceColor: { de: 'Pinsel malt in der Farbe von „{name}“', en: 'Brush paints in the color of “{name}”' },
+    resourceColorRecolor: { de: 'Vorhandene Zuweisungen umfärben ({count})', en: 'Recolor existing allocations ({count})' },
+    resourceColorApply: { de: 'Farbe übernehmen', en: 'Apply color' },
   },
 
   // Custom Columns
@@ -357,6 +368,7 @@ export const translations = {
     removeColor: { de: 'Farbe entfernen', en: 'Remove color' },
     pickColor: { de: 'Farbe wählen', en: 'Pick color' },
     syncedHint: { de: 'Farben & Prozentwerte werden in deinem Account gespeichert.', en: 'Colors & percentages are saved to your account.' },
+    resourceColorHint: { de: 'Ressourcen mit eigener Farbe malen immer in ihrer Farbe (Farbpunkt vor dem Namen); die Leiste zeigt sie beim Überfahren der Zeile.', en: 'Resources with their own color always paint in it (color dot before the name); the bar shows it while you hover the row.' },
   },
 
   // Share Modal

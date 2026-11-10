@@ -10,7 +10,7 @@
 [![Backend: PocketBase](https://img.shields.io/badge/Backend-PocketBase-blue?style=flat-square)](https://pocketbase.io/)
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-![Version](https://img.shields.io/badge/Version-0.9.1-green?style=flat-square)
+![Version](https://img.shields.io/badge/Version-0.10.0-green?style=flat-square)
 
 </div>
 
@@ -36,6 +36,8 @@ Every plan shows its priority, date range, resolution and owner. A plan someone 
 
 Five base colors, your own colors, and percentage presets. They are stored on your account. Keys `1`–`9` and `0` select a preset; `[` and `]` or the scroll wheel cycle them.
 
+A resource can also have its own color: click the dot in front of its name. The color belongs to the name, so every “Anna” in the plan shares it, and a new “Anna” picks it up. Those rows then always paint in that color, whatever the brush base color is; the brush bar and the cursor preview switch to it while you hover such a row. Cells painted earlier keep their color unless you tick “recolor existing allocations”.
+
 <p align="center">
   <img src="./screenshots/brushes.png" width="420" alt="Brush editor with base colors, custom colors and percentage presets" />
 </p>
@@ -53,6 +55,7 @@ Give someone view or edit access. The same dialog turns on a public view-only li
 **Planning**
 
 - Click and drag to paint. Click the same cell again to clear it.
+- Optional color per resource name; it overrides the brush color on those rows.
 - Day, week, month or year. The current period stays centered; paging moves a full window.
 - Project priorities: Immediate, High, Medium, Low, On hold.
 - Custom columns with Markdown. Checkboxes toggle in the rendered cell.
@@ -157,7 +160,7 @@ nginx              reverse proxy
 
 ## Roadmap
 
-Already in: dark mode, public links, CSV export, priorities, custom columns, filters.
+Already in: dark mode, public links, CSV export, priorities, custom columns, filters, resource colors.
 
 Not yet: a public REST API, PDF and Excel export. Ideas past that — calendar sync, utilization charts, overallocation notices — belong in a GitHub issue.
 

@@ -127,9 +127,9 @@ export function autoResourceColumnWidth(opts: {
   let widest = 24 + measureText(headerLabel, { kind: 'hand', size: 16, weight: 600 }) + 8 + 16 + (hasFilter ? 14 : 0)
 
   for (const resource of resources) {
-    // td: px-3 | pl-4 / pl-6 | text-sm | gap-2 + delete button
+    // td: px-3 | pl-0 / pl-2 | color slot 16 + 4 | text-sm | gap-2 + delete button
     const w =
-      24 + (resource.indent ? 24 : 16) + measureText(resource.name, { kind: 'sans', size: 14 }) + (canEdit ? 8 + 16 : 0)
+      24 + (resource.indent ? 28 : 20) + measureText(resource.name, { kind: 'sans', size: 14 }) + (canEdit ? 8 + 16 : 0)
     widest = Math.max(widest, w)
   }
 

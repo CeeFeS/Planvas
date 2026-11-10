@@ -346,6 +346,22 @@ export async function deleteAllocation(id: string): Promise<boolean> {
   return await pb.collection('allocations').delete(id)
 }
 
+// The batch API is disabled by default in PocketBase, so updates run as
+// individual requests with bounded concurrency.
+const RECOLOR_CONCURRENCY = 8
+
+/** Sets the same color on many allocations (e.g. after a resource got a color). */
+export async function updateAllocationColors(ids: string[], colorHex: string): Promise<void> {
+  const pb = getPocketBase()
+  for (let i = 0; i < ids.length; i += RECOLOR_CONCURRENCY) {
+    await Promise.all(
+      ids
+        .slice(i, i + RECOLOR_CONCURRENCY)
+        .map(id => pb.collection('allocations').update(id, { color_hex: colorHex }, { fields: ALLOCATION_FIELDS }))
+    )
+  }
+}
+
 // Upsert: Create or update allocation by resource_id + date
 export async function upsertAllocation(
   resourceId: string, 

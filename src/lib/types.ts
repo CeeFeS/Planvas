@@ -28,6 +28,7 @@
  * - task_id: relation -> tasks
  * - name: string
  * - sort_order: number
+ * - color_hex: string (optional, "#RRGGBB" - überschreibt die Pinselfarbe)
  * - created: datetime (auto)
  * - updated: datetime (auto)
  * 
@@ -88,6 +89,8 @@ export interface Resource extends BaseRecord {
   task_id: string
   name: string
   sort_order: number
+  /** Fixed paint color for this resource; empty = use the brush base color */
+  color_hex?: string
 }
 
 export interface Allocation extends BaseRecord {
@@ -267,6 +270,7 @@ export interface CreateResourceDTO {
   task_id: string
   name: string
   sort_order?: number
+  color_hex?: string
 }
 
 export interface CreateAllocationDTO {

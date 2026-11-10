@@ -27,6 +27,11 @@ import type { RecordSubscription } from 'pocketbase'
 
 // ==================== State Types ====================
 
+export interface HoveredResource {
+  name: string
+  color: string
+}
+
 interface ProjectState {
   // Current project data
   project: Project | null
@@ -52,6 +57,8 @@ interface ProjectState {
   // Brush state
   activeBrush: BrushConfig
   isPainting: boolean
+  /** Colored resource row under the pointer - its color overrides the brush */
+  hoveredResource: HoveredResource | null
   
   // Realtime subscription
   subscription: api.ProjectSubscription | null
@@ -106,6 +113,11 @@ export interface ProjectActions {
   createResourceAsync: (taskId: string, name: string) => Promise<Resource>
   updateResource: (id: string, updates: Partial<Resource>) => void
   updateResourceAsync: (id: string, updates: Partial<Resource>) => Promise<void>
+  /**
+   * Applies the color to every resource with the same name (null removes it).
+   * `recolorExisting` also repaints their allocations.
+   */
+  setResourceColorAsync: (id: string, colorHex: string | null, recolorExisting: boolean) => Promise<void>
   deleteResource: (id: string) => void
   deleteResourceAsync: (id: string) => Promise<void>
   
@@ -144,6 +156,7 @@ export interface ProjectActions {
   // Brush
   setActiveBrush: (brush: BrushConfig) => void
   setIsPainting: (isPainting: boolean) => void
+  setHoveredResource: (resource: HoveredResource | null) => void
   
   // Recompute aggregations
   recomputeAggregations: () => void
@@ -175,6 +188,7 @@ const initialState: ProjectState = {
   error: null,
   activeBrush: { percentage: 50, colorHex: DEFAULT_BASE_COLOR },
   isPainting: false,
+  hoveredResource: null,
   subscription: null,
   presenceList: [],
   sessionId: '',
@@ -342,6 +356,20 @@ export function findResourceInTree(
     }
   }
   return undefined
+}
+
+/**
+ * Resources with the same name are the same person/thing across tasks, so they
+ * share one color. Returns the color of that group (ignoring `excludeId`).
+ */
+function colorForResourceName(resources: Resource[], name: string, excludeId?: string): string | undefined {
+  return resources.find(r => r.id !== excludeId && r.name === name && r.color_hex)?.color_hex
+}
+
+/** Painted cells of all resources sharing `name` - the scope of a recolor. */
+export function countAllocationsForResourceName(state: ProjectState, name: string): number {
+  const ids = new Set(state.resources.filter(r => r.name === name).map(r => r.id))
+  return state.allocations.filter(a => ids.has(a.resource_id)).length
 }
 
 /**
@@ -706,12 +734,14 @@ export const useProjectStore = create<ProjectStore>()(
       const taskResources = get().resources.filter(r => r.task_id === taskId)
       const sortOrder = taskResources.length + 1
       
+      const colorHex = colorForResourceName(get().resources, name)
       const tempId = `temp_${Date.now()}`
       const tempResource: Resource = {
         id: tempId,
         task_id: taskId,
         name,
         sort_order: sortOrder,
+        color_hex: colorHex,
         created: new Date().toISOString(),
         updated: new Date().toISOString(),
       }
@@ -722,6 +752,7 @@ export const useProjectStore = create<ProjectStore>()(
           task_id: taskId,
           name,
           sort_order: sortOrder,
+          ...(colorHex && { color_hex: colorHex }),
         })
         
         set((state) => {
@@ -778,6 +809,15 @@ export const useProjectStore = create<ProjectStore>()(
       if (id.startsWith('temp_')) return
       
       const originalResource = get().resources.find(r => r.id === id)
+
+      // Renamed into an existing colored group: adopt the group's color
+      if (updates.name !== undefined && updates.color_hex === undefined) {
+        const groupColor = colorForResourceName(get().resources, updates.name, id)
+        if (groupColor && groupColor !== originalResource?.color_hex) {
+          updates = { ...updates, color_hex: groupColor }
+        }
+      }
+
       get().updateResource(id, updates)
       
       try {
@@ -787,6 +827,52 @@ export const useProjectStore = create<ProjectStore>()(
           get().updateResource(id, originalResource)
         }
         set((state) => {
+          state.error = error instanceof Error ? error.message : errorText('updateFailed')
+        })
+        throw error
+      }
+    },
+
+    setResourceColorAsync: async (id, colorHex, recolorExisting) => {
+      const resource = get().resources.find(r => r.id === id)
+      if (!resource || id.startsWith('temp_')) return
+
+      const group = get().resources.filter(r => r.name === resource.name && !r.id.startsWith('temp_'))
+      const nextColor = colorHex ?? ''
+      await Promise.all(
+        group
+          .filter(r => (r.color_hex ?? '') !== nextColor)
+          .map(r => get().updateResourceAsync(r.id, { color_hex: nextColor }))
+      )
+      if (!recolorExisting || !colorHex) return
+
+      const groupIds = new Set(group.map(r => r.id))
+      const toRecolor = get().allocations
+        .filter(a => groupIds.has(a.resource_id) && a.color_hex !== colorHex && !a.id.startsWith('temp_'))
+        .map(a => a.id)
+      if (toRecolor.length === 0) return
+
+      const recolorIds = new Set(toRecolor)
+      set((state) => {
+        for (const allocation of state.allocations) {
+          if (recolorIds.has(allocation.id)) allocation.color_hex = colorHex
+        }
+        state.tasksWithData = computeTasksWithData(state.tasks, state.resources, state.allocations)
+      })
+
+      try {
+        await api.updateAllocationColors(toRecolor, colorHex)
+      } catch (error) {
+        // Some updates may have gone through - take the server state as truth
+        const serverAllocations = await api.fetchAllocations([...groupIds]).catch(() => null)
+        set((state) => {
+          if (serverAllocations) {
+            state.allocations = [
+              ...state.allocations.filter(a => !groupIds.has(a.resource_id) || a.id.startsWith('temp_')),
+              ...serverAllocations,
+            ]
+            state.tasksWithData = computeTasksWithData(state.tasks, state.resources, state.allocations)
+          }
           state.error = error instanceof Error ? error.message : errorText('updateFailed')
         })
         throw error
@@ -1466,6 +1552,14 @@ export const useProjectStore = create<ProjectStore>()(
     setIsPainting: (isPainting) => set((state) => {
       state.isPainting = isPainting
     }),
+
+    setHoveredResource: (resource) => {
+      const current = get().hoveredResource
+      if (current?.name === resource?.name && current?.color === resource?.color) return
+      set((state) => {
+        state.hoveredResource = resource
+      })
+    },
     
     // Recompute
     recomputeAggregations: () => set((state) => {
