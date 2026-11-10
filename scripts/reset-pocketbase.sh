@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# TinyPlanvas - PocketBase Reset Script
+# Planvas - PocketBase Reset Script
 # =====================================
 # This script deletes all PocketBase data and restarts fresh.
 # WARNING: All data will be lost!
@@ -24,15 +24,12 @@ fi
 
 echo ""
 echo "🛑 Stopping PocketBase container..."
-docker compose down 2>/dev/null || true
+# Remove the locally built image too (name depends on the compose project)
+docker compose down --rmi local 2>/dev/null || docker compose down 2>/dev/null || true
 
 echo ""
 echo "🗑️  Deleting PocketBase volume (all data)..."
 docker volume rm tinyplanvas_pocketbase_data 2>/dev/null || true
-
-echo ""
-echo "🔧 Removing old Docker image..."
-docker rmi tinyplanvas-pocketbase 2>/dev/null || true
 
 echo ""
 echo "🏗️  Building new Docker image with current migrations..."
@@ -40,7 +37,8 @@ docker compose build --no-cache pocketbase
 
 echo ""
 echo "🚀 Starting PocketBase..."
-docker compose up -d pocketbase
+export POCKETBASE_PORT="${POCKETBASE_PORT:-8090}"
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d pocketbase
 
 echo ""
 echo "⏳ Waiting for PocketBase..."

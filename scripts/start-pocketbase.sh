@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# TinyPlanvas - PocketBase Startup Script
+# Planvas - PocketBase Startup Script
 # ========================================
 # This script starts the PocketBase container and shows the admin URL.
 
@@ -14,11 +14,13 @@ cd "$PROJECT_DIR"
 # Default port (can be overridden with POCKETBASE_PORT env var)
 PORT="${POCKETBASE_PORT:-8090}"
 
-echo "🚀 Starting TinyPlanvas PocketBase on port $PORT..."
+echo "🚀 Starting Planvas PocketBase on port $PORT..."
 echo ""
 
-# Build and start the container
-POCKETBASE_PORT=$PORT docker compose up -d --build pocketbase
+# Publish PocketBase on the host. The production compose file keeps it
+# behind nginx and does not map this port.
+export POCKETBASE_PORT="$PORT"
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build pocketbase
 
 # Wait for PocketBase to be ready
 echo "⏳ Waiting for PocketBase to be ready..."

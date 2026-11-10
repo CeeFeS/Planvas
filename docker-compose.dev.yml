@@ -1,0 +1,7 @@
+# Local development only.
+# Publishes PocketBase on the host so `npm run dev` can reach it.
+# Production (`docker compose up`) does not use this file: PocketBase stays behind nginx.
+services:
+  pocketbase:
+    ports:
+      - "${POCKETBASE_PORT:-8090}:8080"
