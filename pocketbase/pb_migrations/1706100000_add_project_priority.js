@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 /**
- * TinyPlanvas - Add "priority" field to projects collection
+ * Planvas - Add "priority" field to projects collection
  *
  * ADDITIVE & NON-DESTRUCTIVE:
  * - Adds a new optional "select" field `priority` to the existing projects

@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { createProject } from '@/lib/pocketbase-api'
 import { useAuth } from '@/lib/auth-context'
 import { useTranslation } from '@/lib/language-context'
+import { translateErrorMessage } from '@/lib/i18n'
 import { LoginScreen } from '@/components/auth/login-screen'
 import type { Resolution, Priority } from '@/lib/types'
 import { DEFAULT_PRIORITY } from '@/lib/types'
@@ -94,8 +95,8 @@ export default function NewProjectPage() {
     } catch (err) {
       console.error('Failed to create project:', err)
       setError(
-        err instanceof Error 
-          ? err.message 
+        err instanceof Error
+          ? translateErrorMessage(err.message, t)
           : t('newProject', 'createError')
       )
       setIsSubmitting(false)

@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 /**
- * TinyPlanvas - Add created/updated timestamps to projects collection
+ * Planvas - Add created/updated timestamps to projects collection
  * 
  * PocketBase 0.36+ should have these as system fields, but they may be missing
  * if the collection was created with an older schema.

@@ -56,12 +56,7 @@ export function LanguagePanel() {
       <div className="pt-4 border-t border-paper-lines">
         <div className="flex items-center gap-2 text-xs text-ink-faded">
           <Globe size={14} />
-          <span>
-            {language === 'de' 
-              ? 'Die Spracheinstellung wird lokal gespeichert.'
-              : 'Language preference is saved locally.'
-            }
-          </span>
+          <span>{t('settings', 'languageSavedLocally')}</span>
         </div>
       </div>
     </div>

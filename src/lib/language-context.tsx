@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo, R
 import { Language, translations, TranslationKeys, LANGUAGE_NAMES } from './i18n'
 import { de, enUS, Locale } from 'date-fns/locale'
 
-const STORAGE_KEY = 'tinyplanvas-language'
+const STORAGE_KEY = 'planvas-language'
 
 // Get browser language or default to English
 function getBrowserLanguage(): Language {
@@ -67,6 +67,16 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
     setLanguageState(lang)
     saveLanguage(lang)
   }, [])
+
+  useEffect(() => {
+    if (!isInitialized) return
+    document.documentElement.lang = language
+    document.title = translations.meta.title[language]
+    const description = document.querySelector('meta[name="description"]')
+    if (description) {
+      description.setAttribute('content', translations.meta.description[language])
+    }
+  }, [language, isInitialized])
 
   // Translation function
   const t = useCallback((category: keyof TranslationKeys, key: string): string => {

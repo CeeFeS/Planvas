@@ -21,8 +21,11 @@ import {
   differenceInCalendarYears,
   Locale,
 } from 'date-fns'
-import { de } from 'date-fns/locale'
+import { enUS } from 'date-fns/locale'
 import type { Resolution, Allocation, ResourceWithAllocations, TaskWithAggregation } from './types'
+
+/** App version from package.json (injected at build time via next.config.js). */
+export const APP_VERSION: string = process.env.NEXT_PUBLIC_APP_VERSION ?? ''
 
 // Tailwind class merger
 export function cn(...inputs: ClassValue[]) {
@@ -97,11 +100,8 @@ export function diffSlots(later: Date, earlier: Date, resolution: Resolution): n
 }
 
 /**
- * Formatiert ein Datum für die Header-Anzeige.
- * Sprach-/Locale-abhängig: KW-Abkürzung und Monatskürzel richten sich nach der UI-Sprache.
- * - week:  de → "KW27", en → "W27"
- * - month: locale-abhängiges Kurzkürzel (de "Mär" / en "Mar" …)
- * - day/year: sprachneutrale Zahlen
+ * Header label for a time slot. Week prefix and month abbreviation follow the UI language.
+ * A missing locale or language falls back to English.
  */
 export function formatTimeSlotHeader(
   date: Date,
@@ -116,9 +116,9 @@ export function formatTimeSlotHeader(
     case 'year':
       return String(date.getFullYear())
     case 'week':
-      return `${language === 'en' ? 'W' : 'KW'}${format(date, 'w', { locale: locale || de })}`
+      return `${language === 'de' ? 'KW' : 'W'}${format(date, 'w', { locale: locale || enUS })}`
     case 'month':
-      return format(date, 'MMM', { locale: locale || de })
+      return format(date, 'MMM', { locale: locale || enUS })
   }
 }
 
@@ -126,7 +126,7 @@ export function formatTimeSlotHeader(
  * Formatiert Monat/Jahr für Gruppierung
  */
 export function formatTimeSlotGroup(date: Date, resolution: Resolution, locale?: Locale): string {
-  const loc = locale || de
+  const loc = locale || enUS
   switch (resolution) {
     case 'day':
       return format(date, 'MMMM yyyy', { locale: loc })

@@ -1,4 +1,4 @@
-# TinyPlanvas Frontend Dockerfile
+# Planvas Frontend Dockerfile
 # ================================
 # Multi-stage build for optimized production image.
 # Uses Debian slim (not Alpine): npm on Alpine frequently crashes with

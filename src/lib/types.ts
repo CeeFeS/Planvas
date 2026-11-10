@@ -1,5 +1,5 @@
 /**
- * TinyPlanvas - PocketBase Collection Types
+ * Planvas - PocketBase Collection Types
  * 
  * Schema für PocketBase Collections:
  * 
@@ -113,7 +113,7 @@ export interface CustomColumn extends BaseRecord {
   project_id: string
   name: string
   sort_order: number
-  width?: number // persisted column width in px (user-resizable)
+  width?: number // manual column width in px; 0/unset = automatic (content-based)
 }
 
 // Per-row value for a custom column (task or resource row)

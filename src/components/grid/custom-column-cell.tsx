@@ -6,6 +6,8 @@ import type { CustomColumn, CustomRowType } from '@/lib/types'
 import { useTranslation } from '@/lib/language-context'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/ui/markdown-content'
+import { taskListEnter } from '@/lib/markdown-tasks'
+import { sourceOffsetFromPoint, textareaCaretTop } from '@/lib/markdown-source-map'
 
 type EditorViewMode = 'markdown' | 'rendered'
 
@@ -29,6 +31,8 @@ interface CustomColumnCellProps {
   /** subtle background tint variant for task (parent) rows */
   variant?: 'task' | 'resource'
   onOpen: (target: CustomCellEditTarget) => void
+  /** Save a new value straight from the preview (ticking a "- [ ]" task). */
+  onChangeValue?: (columnId: string, rowType: CustomRowType, rowId: string, value: string) => void
 }
 
 export function CustomColumnCell({
@@ -40,6 +44,7 @@ export function CustomColumnCell({
   width,
   variant = 'resource',
   onOpen,
+  onChangeValue,
 }: CustomColumnCellProps) {
   const { t } = useTranslation()
   const contentRef = useRef<HTMLDivElement>(null)
@@ -67,6 +72,11 @@ export function CustomColumnCell({
     onOpen({ column, rowType, rowId, value, canEdit })
   }
 
+  const handleTaskToggle = useCallback(
+    (next: string) => onChangeValue?.(column.id, rowType, rowId, next),
+    [onChangeValue, column.id, rowType, rowId]
+  )
+
   return (
     <td
       className={cn(
@@ -91,7 +101,13 @@ export function CustomColumnCell({
       >
         {value ? (
           <>
-            <MarkdownContent ref={contentRef} content={value} className="markdown-clamp" />
+            <MarkdownContent
+              ref={contentRef}
+              content={value}
+              className="markdown-clamp"
+              onContentChange={canEdit && onChangeValue ? handleTaskToggle : undefined}
+              taskToggleLabel={t('customColumns', 'toggleTask')}
+            />
             {isTruncated && (
               <span className="markdown-clamp-more">{t('customColumns', 'clickForMore')}</span>
             )}
@@ -110,12 +126,35 @@ export function CustomColumnCell({
 
 // ==================== Bottom Split Editor ====================
 
+const EDITOR_HEIGHT_KEY = 'planvas-custom-editor-height'
+const MIN_EDITOR_HEIGHT = 160
+/** Space that always stays visible for the grid above the pane. */
+const MIN_GRID_SPACE = 120
+const KEYBOARD_RESIZE_STEP = 24
+
+function defaultEditorHeight(): number {
+  return Math.min(Math.round(window.innerHeight * 0.42), 420)
+}
+
+function loadEditorHeight(): number {
+  if (typeof window === 'undefined') return 420
+  try {
+    const saved = Number(localStorage.getItem(EDITOR_HEIGHT_KEY))
+    if (Number.isFinite(saved) && saved >= MIN_EDITOR_HEIGHT) return saved
+  } catch {
+    /* ignore */
+  }
+  return defaultEditorHeight()
+}
+
 interface CustomValueEditorProps {
   columnName: string
   initialValue: string
   canEdit: boolean
   onCancel: () => void
   onSave: (value: string) => void
+  /** Save without closing (used when a task is ticked in the rendered view). */
+  onPersist?: (value: string) => void
 }
 
 export function CustomValueEditor({
@@ -124,6 +163,7 @@ export function CustomValueEditor({
   canEdit,
   onCancel,
   onSave,
+  onPersist,
 }: CustomValueEditorProps) {
   const { t } = useTranslation()
   const [text, setText] = useState(initialValue)
@@ -132,18 +172,104 @@ export function CustomValueEditor({
     canEdit && !initialValue.trim() ? 'markdown' : 'rendered'
   )
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const paneRef = useRef<HTMLDivElement>(null)
+  const renderedRef = useRef<HTMLDivElement>(null)
+  // Caret position to restore when switching to the editor (double-click)
+  const pendingCaretRef = useRef<number | null>(null)
   const isDirty = canEdit && text !== initialValue
   const showSaveActions = canEdit && (viewMode === 'markdown' || isDirty)
 
+  // Adopt outside changes (other users, a box ticked in the grid) - but only
+  // while there are no unsaved local edits, which must never be overwritten.
+  const lastInitialRef = useRef(initialValue)
   useEffect(() => {
-    setText(initialValue)
+    const previous = lastInitialRef.current
+    lastInitialRef.current = initialValue
+    setText((current) => (current === previous ? initialValue : current))
   }, [initialValue])
 
   useEffect(() => {
-    if (canEdit && viewMode === 'markdown') {
-      textareaRef.current?.focus()
-    }
+    if (!canEdit || viewMode !== 'markdown') return
+    const ta = textareaRef.current
+    if (!ta) return
+    ta.focus()
+    const caret = pendingCaretRef.current
+    pendingCaretRef.current = null
+    if (caret == null) return
+    const offset = Math.min(caret, ta.value.length)
+    ta.setSelectionRange(offset, offset)
+    // Scroll the caret into view (roughly a third from the top)
+    const top = textareaCaretTop(ta, offset)
+    ta.scrollTop = Math.max(0, top - ta.clientHeight / 3)
   }, [canEdit, viewMode])
+
+  // Double-click in the rendered view: open the editor at that very spot
+  const handleRenderedDoubleClick = (e: React.MouseEvent) => {
+    if (!canEdit) return
+    const root = renderedRef.current
+    const offset = root ? sourceOffsetFromPoint(root, e.clientX, e.clientY, text) : null
+    // Outside of any text (e.g. below the content): end of the text
+    pendingCaretRef.current = offset ?? text.length
+    window.getSelection()?.removeAllRanges()
+    setViewMode('markdown')
+  }
+
+  // ---------- Resizable pane (drag the top edge) ----------
+  const [paneHeight, setPaneHeight] = useState(loadEditorHeight)
+  const [isResizing, setIsResizing] = useState(false)
+  const resizeStartRef = useRef<{ y: number; height: number } | null>(null)
+
+  const maxPaneHeight = () => {
+    const available = paneRef.current?.parentElement?.getBoundingClientRect().height ?? window.innerHeight
+    return Math.max(MIN_EDITOR_HEIGHT, available - MIN_GRID_SPACE)
+  }
+  const clampHeight = (h: number) => Math.round(Math.min(maxPaneHeight(), Math.max(MIN_EDITOR_HEIGHT, h)))
+
+  const persistHeight = (h: number | null) => {
+    try {
+      if (h == null) localStorage.removeItem(EDITOR_HEIGHT_KEY)
+      else localStorage.setItem(EDITOR_HEIGHT_KEY, String(h))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const handleResizePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    resizeStartRef.current = { y: e.clientY, height: paneRef.current?.offsetHeight ?? paneHeight }
+    setIsResizing(true)
+  }
+
+  const handleResizePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const start = resizeStartRef.current
+    if (!start) return
+    // Dragging up makes the pane taller
+    setPaneHeight(clampHeight(start.height + (start.y - e.clientY)))
+  }
+
+  const handleResizePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!resizeStartRef.current) return
+    resizeStartRef.current = null
+    setIsResizing(false)
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+    persistHeight(paneRef.current?.offsetHeight ?? paneHeight)
+  }
+
+  const handleResizeKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = e.key === 'ArrowUp' ? KEYBOARD_RESIZE_STEP : e.key === 'ArrowDown' ? -KEYBOARD_RESIZE_STEP : 0
+    if (!step) return
+    e.preventDefault()
+    const next = clampHeight(paneHeight + step)
+    setPaneHeight(next)
+    persistHeight(next)
+  }
+
+  const resetPaneHeight = () => {
+    setPaneHeight(clampHeight(defaultEditorHeight()))
+    persistHeight(null)
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -157,12 +283,71 @@ export function CustomValueEditor({
 
   const displayValue = canEdit ? text : initialValue
 
+  // Ticking a task in the rendered view: saved right away, unless there are
+  // other unsaved edits - then it simply becomes part of them.
+  const handleTaskToggle = (next: string) => {
+    const wasDirty = text !== initialValue
+    setText(next)
+    if (!wasDirty && onPersist) onPersist(next)
+  }
+
+  // Enter in a task line continues the task list; Enter in an empty task
+  // removes the marker again (see taskListEnter).
+  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (
+      e.key === 'Enter' &&
+      !e.shiftKey &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.nativeEvent.isComposing
+    ) {
+      const ta = e.currentTarget
+      const edit = taskListEnter(ta.value, ta.selectionStart, ta.selectionEnd)
+      if (edit) {
+        e.preventDefault()
+        applyTextEdit(ta, edit, setText)
+      }
+    }
+    // Escape / Ctrl+Enter bubble up to the editor container's handler
+  }
+
   return (
     <div
-      className="flex-none border-t border-paper-lines bg-surface flex flex-col shadow-[0_-4px_16px_rgba(0,0,0,0.06)]"
-      style={{ height: 'min(42vh, 420px)' }}
+      ref={paneRef}
+      className="relative flex-none border-t border-paper-lines bg-surface flex flex-col shadow-[0_-4px_16px_rgba(0,0,0,0.06)]"
+      // max-height keeps the grid visible when the window gets smaller
+      style={{ height: paneHeight, maxHeight: `calc(100% - ${MIN_GRID_SPACE}px)`, minHeight: MIN_EDITOR_HEIGHT }}
       onKeyDown={handleKeyDown}
     >
+      {/* Resize handle on the top edge: drag up/down, double-click resets */}
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label={t('customColumns', 'resizePane')}
+        aria-valuemin={MIN_EDITOR_HEIGHT}
+        aria-valuenow={paneHeight}
+        tabIndex={0}
+        title={t('customColumns', 'resizePane')}
+        onPointerDown={handleResizePointerDown}
+        onPointerMove={handleResizePointerMove}
+        onPointerUp={handleResizePointerUp}
+        onPointerCancel={handleResizePointerUp}
+        onDoubleClick={resetPaneHeight}
+        onKeyDown={handleResizeKeyDown}
+        className={cn(
+          'group/pane-resize absolute inset-x-0 top-0 h-2.5 z-20 cursor-row-resize touch-none flex items-center justify-center outline-none',
+          'focus-visible:bg-ink-blue/10'
+        )}
+      >
+        <span
+          className={cn(
+            'h-1 w-10 rounded-full transition-colors',
+            isResizing ? 'bg-ink-blue/70' : 'bg-paper-lines group-hover/pane-resize:bg-ink-blue/50'
+          )}
+        />
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-paper-lines bg-paper-warm/50 flex-none gap-3">
         <div className="min-w-0">
@@ -243,7 +428,7 @@ export function CustomValueEditor({
               ref={textareaRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
-              onKeyDown={handleKeyDown}
+              onKeyDown={handleTextareaKeyDown}
               placeholder={t('customColumns', 'placeholder')}
               className="flex-1 w-full min-h-0 resize-none bg-transparent px-4 py-3 text-sm font-mono text-ink outline-none leading-relaxed"
               spellCheck={false}
@@ -261,11 +446,17 @@ export function CustomValueEditor({
           )
         ) : (
           <div
+            ref={renderedRef}
             className="flex-1 min-h-0 overflow-y-auto px-4 py-3"
-            onDoubleClick={canEdit ? () => setViewMode('markdown') : undefined}
+            onDoubleClick={canEdit ? handleRenderedDoubleClick : undefined}
           >
             {displayValue.trim() ? (
-              <MarkdownContent content={displayValue} />
+              <MarkdownContent
+                content={displayValue}
+                onContentChange={canEdit ? handleTaskToggle : undefined}
+                taskToggleLabel={t('customColumns', 'toggleTask')}
+                sourcePositions={canEdit}
+              />
             ) : (
               <span className="text-ink-faded text-sm italic">{t('customColumns', 'emptyContent')}</span>
             )}
@@ -274,6 +465,36 @@ export function CustomValueEditor({
       </div>
     </div>
   )
+}
+
+/**
+ * Apply an edit to the textarea. `execCommand('insertText')` keeps the
+ * browser's undo history intact (Ctrl+Z works as expected) and fires the
+ * regular input event, so React's onChange picks it up. Falls back to a plain
+ * state update where the command is unavailable.
+ */
+function applyTextEdit(
+  ta: HTMLTextAreaElement,
+  edit: { start: number; end: number; text: string; caret: number },
+  setText: (value: string) => void
+) {
+  ta.focus()
+  ta.setSelectionRange(edit.start, edit.end)
+  let applied = false
+  try {
+    applied =
+      edit.text === ''
+        ? edit.start === edit.end || document.execCommand('delete')
+        : document.execCommand('insertText', false, edit.text)
+  } catch {
+    applied = false
+  }
+  if (applied) {
+    ta.setSelectionRange(edit.caret, edit.caret)
+    return
+  }
+  setText(ta.value.slice(0, edit.start) + edit.text + ta.value.slice(edit.end))
+  requestAnimationFrame(() => ta.setSelectionRange(edit.caret, edit.caret))
 }
 
 // ==================== Header Cell ====================
@@ -323,7 +544,7 @@ export function CustomColumnHeaderCell({ column, canEdit, width, onRename, onDel
               if (e.key === 'Enter') handleSave()
               if (e.key === 'Escape') { setName(column.name); setEditing(false) }
             }}
-            className="input-notebook text-xs font-hand min-w-0 flex-1"
+            className="input-inline-edit font-hand text-xs text-ink-light text-left min-w-0 flex-1"
             autoFocus
           />
         ) : (

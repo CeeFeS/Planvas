@@ -34,7 +34,7 @@ export default function SharedProjectPage() {
       } catch (err) {
         console.error('Failed to load shared project:', err)
         if (!mounted) return
-        setLoadError(err instanceof Error ? err.message : t('share', 'sharedLoadError'))
+        setLoadError(t('share', 'sharedLoadError'))
         useProjectStore.setState({ isLoading: false })
       }
     }

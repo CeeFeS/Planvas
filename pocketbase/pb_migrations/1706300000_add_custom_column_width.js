@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 /**
- * TinyPlanvas - Add "width" field to custom_columns collection
+ * Planvas - Add "width" field to custom_columns collection
  *
  * ADDITIVE & NON-DESTRUCTIVE:
  * - Adds a new optional "number" field `width` to the existing custom_columns

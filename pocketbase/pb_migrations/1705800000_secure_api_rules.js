@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 /**
- * TinyPlanvas - Secure API Rules Migration
+ * Planvas - Secure API Rules Migration
  * 
  * This migration updates all collections with permission-based access control.
  * 

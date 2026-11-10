@@ -6,15 +6,34 @@ export type Theme = 'light' | 'dark' | 'system'
 /** The actually applied theme (resolved from "system") */
 export type ResolvedTheme = 'light' | 'dark'
 
-const STORAGE_KEY = 'tinyplanvas-theme'
+const STORAGE_KEY = 'planvas-theme'
 
 /**
  * Inline script (injected in <head>) that applies the persisted theme BEFORE
  * React hydrates, preventing a flash of the wrong theme. Keep in sync with the
  * logic below. Default is "light".
+ *
+ * It also carries over settings saved under the old "TinyPlanvas" storage
+ * keys (`tinyplanvas-*` / `tinyplanvas_*` -> `planvas-*` / `planvas_*`). It
+ * runs before any app bundle, so every later read already sees the new keys.
  */
 export const THEME_INIT_SCRIPT = `
 (function() {
+  try {
+    var legacy = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf('tinyplanvas') === 0) legacy.push(k);
+    }
+    for (var j = 0; j < legacy.length; j++) {
+      var oldKey = legacy[j];
+      var newKey = 'planvas' + oldKey.slice('tinyplanvas'.length);
+      if (localStorage.getItem(newKey) === null) {
+        localStorage.setItem(newKey, localStorage.getItem(oldKey));
+      }
+      localStorage.removeItem(oldKey);
+    }
+  } catch (e) {}
   try {
     var t = localStorage.getItem('${STORAGE_KEY}') || 'light';
     var isDark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);

@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 /**
- * TinyPlanvas - Custom Columns feature
+ * Planvas - Custom Columns feature
  *
  * ADDITIVE & NON-DESTRUCTIVE:
  * - Adds two NEW collections: `custom_columns` and `custom_values`.

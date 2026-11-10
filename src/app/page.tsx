@@ -8,6 +8,7 @@ import { Header } from '@/components/layout/header'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { useAuth } from '@/lib/auth-context'
 import { useTranslation } from '@/lib/language-context'
+import { translateErrorMessage } from '@/lib/i18n'
 import { format, parseISO } from 'date-fns'
 import * as api from '@/lib/pocketbase-api'
 import type { ProjectWithOwner } from '@/lib/pocketbase-api'
@@ -98,7 +99,7 @@ export default function DashboardPage() {
         setError(null)
       } catch (err) {
         console.error('Failed to load projects:', err)
-        setError(err instanceof Error ? err.message : t('dashboard', 'loadingError'))
+        setError(err instanceof Error ? translateErrorMessage(err.message, t) : t('dashboard', 'loadingError'))
       } finally {
         setIsLoading(false)
       }
@@ -147,7 +148,7 @@ export default function DashboardPage() {
       // Realtime subscription will remove it from the list
     } catch (err) {
       console.error('Failed to delete project:', err)
-      setError(err instanceof Error ? err.message : t('dashboard', 'deleteError'))
+      setError(err instanceof Error ? translateErrorMessage(err.message, t) : t('dashboard', 'deleteError'))
     } finally {
       setDeletingId(null)
     }

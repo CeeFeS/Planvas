@@ -1,4 +1,5 @@
 import PocketBase, { RecordSubscription } from 'pocketbase'
+import { errorText } from './i18n'
 import { getPocketBase, clearAuthCookie } from './pocketbase'
 import type {
   Project,
@@ -127,7 +128,7 @@ export function generateShareToken(): string {
 
 function assertShareToken(token: string): string {
   if (!SHARE_TOKEN_RE.test(token)) {
-    throw new Error('Ungültiger Share-Link')
+    throw new Error(errorText('invalidShareLink'))
   }
   return token
 }
@@ -179,7 +180,7 @@ export async function fetchSharedProject(token: string): Promise<ProjectFullData
 
   const project = projects[0]
   if (!project) {
-    throw new Error('Share-Link ungültig oder deaktiviert')
+    throw new Error(errorText('shareLinkDisabled'))
   }
 
   const projectId = project.id
@@ -412,7 +413,8 @@ export async function createCustomColumn(data: CreateCustomColumnDTO): Promise<C
     project_id: data.project_id,
     name: data.name,
     sort_order: data.sort_order ?? 0,
-    width: data.width ?? 180,
+    // 0 = automatic (content-based) width until someone resizes the column
+    width: data.width ?? 0,
   })
 }
 
@@ -489,7 +491,7 @@ export async function fetchProjectFullData(projectId: string): Promise<ProjectFu
   const currentUser = getCurrentUser()
   
   if (!currentUser) {
-    throw new Error('Nicht authentifiziert')
+    throw new Error(errorText('notAuthenticated'))
   }
   
   // Fetch project
@@ -516,7 +518,7 @@ export async function fetchProjectFullData(projectId: string): Promise<ProjectFu
   
   // If no permission, throw error
   if (!userPermission) {
-    throw new Error('Keine Berechtigung für dieses Projekt. Bitte den Projektbesitzer um Freigabe bitten.')
+    throw new Error(errorText('noProjectPermission'))
   }
   
   // Tasks and custom columns don't depend on each other, so they go out
@@ -851,19 +853,20 @@ export function getPresenceColor(sessionId: string): string {
 
 // Generate a random user name
 export function generateUserName(): string {
-  const adjectives = ['Fleißig', 'Kreativ', 'Schnell', 'Clever', 'Fokussiert', 'Motiviert']
-  const nouns = ['Planer', 'Manager', 'Stratege', 'Denker', 'Macher', 'Team']
+  const adjectives = ['Busy', 'Creative', 'Swift', 'Clever', 'Focused', 'Motivated']
+  const nouns = ['Planner', 'Manager', 'Strategist', 'Thinker', 'Maker', 'Teammate']
   const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
   const noun = nouns[Math.floor(Math.random() * nouns.length)]
-  return `${adj}er ${noun}`
+  return `${adj} ${noun}`
 }
 
 // Fetch active presence records for a project
 export async function fetchPresence(projectId: string): Promise<Presence[]> {
   const pb = getPocketBase()
   
-  // Get presence records updated in the last 30 seconds
-  const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString()
+  // PocketBase compares date filters against "YYYY-MM-DD HH:MM:SS.mmmZ".
+  // toISOString() uses a "T" separator, which matches no rows.
+  const thirtySecondsAgo = new Date(Date.now() - 30000).toISOString().replace('T', ' ')
   
   try {
     return await pb.collection('presence').getFullList<Presence>({
@@ -1061,7 +1064,7 @@ export async function updateUserPreferences(patch: Partial<UserPreferences>): Pr
   const pb = getPocketBase()
   const model = pb.authStore.model as unknown as User | null
   if (!pb.authStore.isValid || !model) {
-    throw new Error('Nicht authentifiziert')
+    throw new Error(errorText('notAuthenticated'))
   }
   const next: UserPreferences = { ...getCurrentUserPreferences(), ...patch }
   const updated = await pb.collection('users').update<User>(model.id, { preferences: next })
@@ -1082,7 +1085,7 @@ export function onAuthStateChange(callback: (user: User | null) => void): () => 
 // ==================== User Management API ====================
 
 // Storage key for setup status
-const SETUP_COMPLETE_KEY = 'tinyplanvas_setup_complete'
+const SETUP_COMPLETE_KEY = 'planvas_setup_complete'
 
 // Check if initial setup has been completed (uses localStorage as fallback)
 export function isSetupComplete(): boolean {
@@ -1188,7 +1191,7 @@ export async function hasUsers(): Promise<boolean> {
 }
 
 // Storage for first admin user ID (fallback if isAdmin field doesn't exist)
-const FIRST_ADMIN_ID_KEY = 'tinyplanvas_first_admin_id'
+const FIRST_ADMIN_ID_KEY = 'planvas_first_admin_id'
 
 export function getFirstAdminId(): string | null {
   if (typeof window === 'undefined') return null
@@ -1262,7 +1265,7 @@ export async function createFirstAdmin(data: {
         return user
       } catch (loginError) {
         console.error('[Setup] Login failed for existing user:', loginError)
-        throw new Error('Ein Benutzer existiert bereits. Bitte nutze den Login.')
+        throw new Error(errorText('userAlreadyExists'))
       }
     }
   } catch (checkError) {
@@ -1342,7 +1345,7 @@ export async function createFirstAdmin(data: {
     
     // Check if it's a duplicate email error
     if (pbError.response?.data?.email) {
-      throw new Error('Diese E-Mail-Adresse wird bereits verwendet. Bitte nutze den Login.')
+      throw new Error(errorText('emailInUse'))
     }
     
     throw error

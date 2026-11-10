@@ -229,8 +229,9 @@ body {
   border: none;
   border-bottom: 1px dashed transparent;
   padding: 4px 2px;
+  /* No font-size here: this file comes after @tailwind utilities, so it would
+     override text-sm/text-xs on the input. Preflight already inherits. */
   font-family: inherit;
-  font-size: inherit;
   color: var(--ink-default);
   outline: none;
   transition: border-color 0.2s ease;
@@ -249,6 +250,43 @@ body {
 .input-notebook::placeholder {
   color: var(--ink-faded);
   font-style: italic;
+}
+
+/*
+ * Inline edit fields that temporarily replace an `.editable-text` /
+ * `.editable-number` button (task, subtask, resource, ID, custom column
+ * header, min/max). They copy that button's box exactly - padding, negative
+ * margin, 1px bottom border, inherited line-height - so switching between
+ * view and edit never changes the row or header height or the text size.
+ */
+.input-inline-edit,
+.input-inline-number {
+  /* inline-block like the <button>: keeps the cell's line box (strut) */
+  display: inline-block;
+  min-width: 0;
+  background: rgb(var(--ink-blue-rgb) / 0.06);
+  border: none;
+  border-bottom: 1px solid var(--ink-blue);
+  outline: none;
+  /* font, size, line-height and color come from the utility classes (as on
+     the button they replace) via preflight's `inherit` */
+}
+.input-inline-edit {
+  padding: 2px 6px;
+  margin: -2px -6px;
+  border-radius: 3px;
+}
+.input-inline-number {
+  width: 100%;
+  padding: 2px 4px;
+  border-radius: 2px;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.input-inline-number::-webkit-inner-spin-button,
+.input-inline-number::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* Number inputs */
@@ -1098,6 +1136,15 @@ table.w-full .time-slot-col {
 .markdown-body input[type="checkbox"] {
   margin-right: 0.35em;
   vertical-align: middle;
+}
+/* Task lists: the checkbox replaces the bullet */
+.markdown-body li.task-list-item { list-style: none; }
+.markdown-body ul.contains-task-list { padding-left: 1.25em; }
+.markdown-body li.task-list-item > input[type="checkbox"] { margin-left: -1.25em; margin-right: 0.45em; }
+.markdown-body li.task-list-item:has(> input[type="checkbox"]:checked) { color: var(--ink-faded); }
+.markdown-body input.markdown-task-toggle {
+  cursor: pointer;
+  accent-color: var(--ink-blue);
 }
 
 .markdown-body img {

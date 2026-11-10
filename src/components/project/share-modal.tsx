@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   X, Share2, Users, Loader2, Trash2, Eye, Edit3, Search,
   Link2, Copy, Check, RefreshCw, Globe, Download, FileSpreadsheet,
 } from 'lucide-react'
 import { useTranslation } from '@/lib/language-context'
+import { translateErrorMessage } from '@/lib/i18n'
 import * as api from '@/lib/pocketbase-api'
 import { buildProjectCsv, csvFileName, downloadCsv } from '@/lib/csv-export'
 import type { User, ProjectPermission, PermissionLevel, Project } from '@/lib/types'
@@ -39,6 +40,11 @@ export function ShareProjectModal({
   onProjectShareChange,
 }: ShareProjectModalProps) {
   const { t, language } = useTranslation()
+  const messageFrom = useCallback(
+    (err: unknown, fallback: string) =>
+      err instanceof Error ? translateErrorMessage(err.message, t) : fallback,
+    [t]
+  )
   const [tab, setTab] = useState<ShareTab>(isOwner ? 'users' : 'export')
   const [users, setUsers] = useState<User[]>([])
   const [permissions, setPermissions] = useState<ProjectPermission[]>([])
@@ -74,14 +80,14 @@ export function ShareProjectModal({
         setProject(projectData)
       } catch (err) {
         console.error('Error loading data:', err)
-        setError(err instanceof Error ? err.message : t('share', 'loadError'))
+        setError(messageFrom(err, t('share', 'loadError')))
       } finally {
         setIsLoading(false)
       }
     }
 
     loadData()
-  }, [isOpen, isOwner, projectId, t])
+  }, [isOpen, isOwner, projectId, t, messageFrom])
 
   const shareUrl = useMemo(() => {
     if (!project?.share_enabled || !project.share_token) return ''
@@ -122,7 +128,7 @@ export function ShareProjectModal({
       })
     } catch (err) {
       console.error('Error setting permission:', err)
-      setError(err instanceof Error ? err.message : t('share', 'saveError'))
+      setError(messageFrom(err, t('share', 'saveError')))
     } finally {
       setSavingUserId(null)
     }
@@ -140,7 +146,7 @@ export function ShareProjectModal({
       setPermissions(prev => prev.filter(p => p.id !== permission.id))
     } catch (err) {
       console.error('Error removing permission:', err)
-      setError(err instanceof Error ? err.message : t('share', 'removeError'))
+      setError(messageFrom(err, t('share', 'removeError')))
     } finally {
       setSavingUserId(null)
     }
@@ -162,7 +168,7 @@ export function ShareProjectModal({
       }
     } catch (err) {
       console.error('Error toggling share link:', err)
-      setError(err instanceof Error ? err.message : t('share', 'linkError'))
+      setError(messageFrom(err, t('share', 'linkError')))
     } finally {
       setLinkBusy(false)
     }
@@ -176,7 +182,7 @@ export function ShareProjectModal({
       applyProjectUpdate(await api.regenerateProjectShareLink(projectId))
     } catch (err) {
       console.error('Error regenerating share link:', err)
-      setError(err instanceof Error ? err.message : t('share', 'linkError'))
+      setError(messageFrom(err, t('share', 'linkError')))
     } finally {
       setLinkBusy(false)
     }
@@ -210,14 +216,14 @@ export function ShareProjectModal({
           color: t('share', 'csvColor'),
           taskSuffix: t('share', 'csvTaskSuffix'),
           resourceSuffix: t('share', 'csvResourceSuffix'),
-          weekPrefix: language === 'en' ? 'W' : 'KW',
+          weekPrefix: language === 'de' ? 'KW' : 'W',
         },
         decimalSeparator: language === 'de' ? ',' : '.',
       })
       downloadCsv(csvFileName(data.project.name), csv)
     } catch (err) {
       console.error('Error exporting CSV:', err)
-      setError(err instanceof Error ? err.message : t('share', 'exportError'))
+      setError(messageFrom(err, t('share', 'exportError')))
     } finally {
       setExportBusy(false)
     }

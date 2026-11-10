@@ -14,6 +14,7 @@ const ShareProjectModal = dynamic(
 )
 import { useAuth } from '@/lib/auth-context'
 import { useTranslation } from '@/lib/language-context'
+import { translateErrorMessage } from '@/lib/i18n'
 import { LoginScreen } from '@/components/auth/login-screen'
 import { PrioritySelect } from '@/components/ui/priority-select'
 import * as api from '@/lib/pocketbase-api'
@@ -165,7 +166,7 @@ export default function ProjectPage() {
           <AlertCircle className="w-12 h-12 text-red-500" />
           <div className="text-ink-light text-center">
             <p className="font-medium text-ink mb-1">{t('projectDetail', 'loadingError')}</p>
-            <p className="text-sm">{error}</p>
+            <p className="text-sm">{translateErrorMessage(error, t)}</p>
           </div>
           <button 
             onClick={() => router.push('/')}
@@ -206,7 +207,7 @@ export default function ProjectPage() {
             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-red-800">{t('common', 'error')}</p>
-              <p className="text-sm text-red-600">{error}</p>
+              <p className="text-sm text-red-600">{translateErrorMessage(error, t)}</p>
             </div>
           </div>
         </div>

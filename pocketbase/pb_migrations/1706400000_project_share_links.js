@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 /**
- * TinyPlanvas - Public view-only share links for projects
+ * Planvas - Public view-only share links for projects
  *
  * ADDITIVE & NON-DESTRUCTIVE:
  * - Adds `share_enabled` (bool) and `share_token` (text) to projects

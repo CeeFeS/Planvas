@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 /**
- * TinyPlanvas - Presence Collection Migration
+ * Planvas - Presence Collection Migration
  * 
  * Tracks which users are currently viewing which projects.
  * Used for real-time collaboration awareness.

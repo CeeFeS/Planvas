@@ -8,6 +8,8 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth-context'
 import { useLanguage } from '@/lib/language-context'
 import { useTheme } from '@/lib/theme-context'
+import { APP_VERSION } from '@/lib/utils'
+import { PlanvasLogo } from '@/components/ui/planvas-logo'
 
 // The settings dialog pulls in the admin panel and is opened rarely, so it must
 // not weigh down the header that ships with every page.
@@ -73,30 +75,24 @@ export function Header({
             )}
             
             <div className="flex items-center gap-2">
-              {/* Logo - simple paper/canvas icon */}
-              <div className="w-8 h-8 rounded bg-gradient-to-br from-chip-green-200 to-chip-green-400 flex items-center justify-center shadow-sm">
-                <svg 
-                  viewBox="0 0 24 24" 
-                  className="w-5 h-5 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <line x1="8" y1="8" x2="16" y2="8" />
-                  <line x1="8" y1="12" x2="14" y2="12" />
-                  <line x1="8" y1="16" x2="12" y2="16" />
-                </svg>
-              </div>
+              <PlanvasLogo size={32} className="drop-shadow-sm" />
               
               {isPublic ? (
                 <span className="font-hand text-2xl text-ink leading-none">
-                  TinyPlanvas
+                  Planvas
                 </span>
               ) : (
                 <Link href="/" className="font-hand text-2xl text-ink group-hover:text-ink-blue transition-colors leading-none hover:text-ink-blue">
-                  TinyPlanvas
+                  Planvas
                 </Link>
+              )}
+              {APP_VERSION && (
+                <span
+                  className="hidden sm:inline self-end mb-0.5 font-mono text-[10px] leading-none text-ink-faded/70 select-none"
+                  title={`Planvas ${APP_VERSION}`}
+                >
+                  v{APP_VERSION}
+                </span>
               )}
             </div>
           </div>

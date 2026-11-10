@@ -12,10 +12,10 @@ import {
 } from './types'
 
 // localStorage only caches the account values for an instant first paint
-const STORAGE_KEY_PERCENTAGES = 'tinyplanvas-brush-percentages'
-const LEGACY_STORAGE_KEY_PERCENTAGES = 'tinyplanvas-custom-percentages'
-const STORAGE_KEY_BASE_COLOR = 'tinyplanvas-base-color'
-const STORAGE_KEY_CUSTOM_COLORS = 'tinyplanvas-custom-colors'
+const STORAGE_KEY_PERCENTAGES = 'planvas-brush-percentages'
+const LEGACY_STORAGE_KEY_PERCENTAGES = 'planvas-custom-percentages'
+const STORAGE_KEY_BASE_COLOR = 'planvas-base-color'
+const STORAGE_KEY_CUSTOM_COLORS = 'planvas-custom-colors'
 
 const SAVE_DEBOUNCE_MS = 500
 

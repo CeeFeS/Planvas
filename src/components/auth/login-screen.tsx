@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Eye, EyeOff, LogIn, Loader2, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { useTranslation } from '@/lib/language-context'
+import { APP_VERSION } from '@/lib/utils'
+import { PlanvasLogo } from '@/components/ui/planvas-logo'
 
 export function LoginScreen() {
   const { login, isLoading } = useAuth()
@@ -88,23 +90,17 @@ export function LoginScreen() {
           {/* Header */}
           <div className="text-center mb-8 relative">
             {/* Logo */}
-            <div className="w-16 h-16 mx-auto mb-4 rounded-lg bg-gradient-to-br from-chip-green-200 to-chip-green-400 flex items-center justify-center shadow-md">
-              <svg 
-                viewBox="0 0 24 24" 
-                className="w-10 h-10 text-white"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <line x1="8" y1="8" x2="16" y2="8" />
-                <line x1="8" y1="12" x2="14" y2="12" />
-                <line x1="8" y1="16" x2="12" y2="16" />
-              </svg>
+            <div className="inline-flex mx-auto mb-4">
+              <PlanvasLogo size={64} className="drop-shadow-md" />
             </div>
 
             <h1 className="font-hand text-3xl text-ink mb-2">
-              TinyPlanvas
+              Planvas
+              {APP_VERSION && (
+                <span className="ml-1.5 align-top font-mono text-[10px] leading-none text-ink-faded/70 select-none">
+                  v{APP_VERSION}
+                </span>
+              )}
             </h1>
             <p className="text-ink-light text-sm">
               {t('auth', 'loginTitle')}

@@ -1,4 +1,4 @@
-// i18n translations for TinyPlanvas
+// i18n translations for Planvas
 // Supports German (de) and English (en)
 
 export type Language = 'de' | 'en'
@@ -52,7 +52,7 @@ export const translations = {
 
   // Setup Screen
   setup: {
-    welcome: { de: 'Willkommen bei TinyPlanvas!', en: 'Welcome to TinyPlanvas!' },
+    welcome: { de: 'Willkommen bei Planvas!', en: 'Welcome to Planvas!' },
     createAdmin: { de: 'Erstelle deinen ersten Administrator-Account', en: 'Create your first admin account' },
     initialSetup: { de: 'Ersteinrichtung', en: 'Initial Setup' },
     firstUserInfo: { de: 'Dies ist der erste Benutzer und wird automatisch als Administrator angelegt.', en: 'This is the first user and will be automatically created as an administrator.' },
@@ -89,6 +89,7 @@ export const translations = {
     administration: { de: 'Administration', en: 'Administration' },
     language: { de: 'Sprache', en: 'Language' },
     languageDesc: { de: 'Wähle die Sprache der Benutzeroberfläche', en: 'Choose the interface language' },
+    languageSavedLocally: { de: 'Die Spracheinstellung wird lokal gespeichert.', en: 'Language preference is saved locally.' },
     appearance: { de: 'Darstellung', en: 'Appearance' },
     appearanceDesc: { de: 'Wähle das Erscheinungsbild der Oberfläche', en: 'Choose the look of the interface' },
     themeLight: { de: 'Hell', en: 'Light' },
@@ -301,6 +302,12 @@ export const translations = {
     filterColumn: { de: 'Spalte filtern', en: 'Filter column' },
     clearFilter: { de: 'Filter zurücksetzen', en: 'Clear filter' },
     noFilterValues: { de: 'Keine Werte vorhanden', en: 'No values available' },
+    filterSearch: { de: 'Suchen…', en: 'Search…' },
+    filterSelectAll: { de: 'Alle auswählen', en: 'Select all' },
+    filterDeselectAll: { de: 'Alle abwählen', en: 'Deselect all' },
+    filterNoMatches: { de: 'Keine Treffer', en: 'No matches' },
+    filterNoRows: { de: 'Keine Einträge entsprechen den aktiven Filtern.', en: 'No entries match the active filters.' },
+    autoWidthHint: { de: 'Ziehen: Breite ändern · Doppelklick: automatische Breite', en: 'Drag: resize · Double-click: auto width' },
   },
 
   // Custom Columns
@@ -317,10 +324,12 @@ export const translations = {
     modeEdit: { de: 'Bearbeiten', en: 'Edit' },
     modeView: { de: 'Lesen', en: 'View' },
     modeSource: { de: 'Quelltext', en: 'Source' },
-    renderedHint: { de: 'Doppelklick oder „Bearbeiten“ zum Ändern', en: 'Double-click or “Edit” to make changes' },
+    renderedHint: { de: 'Doppelklick auf eine Stelle oder „Bearbeiten“ zum Ändern', en: 'Double-click a spot or “Edit” to make changes' },
     emptyContent: { de: 'Noch nichts eingegeben …', en: 'Nothing entered yet …' },
     placeholder: { de: 'Text eingeben … Markdown & Zeilenumbrüche werden unterstützt.', en: 'Enter text … Markdown & line breaks are supported.' },
-    markdownHint: { de: 'Markdown wird unterstützt · Strg/Cmd+Enter zum Speichern', en: 'Markdown supported · Ctrl/Cmd+Enter to save' },
+    markdownHint: { de: 'Markdown wird unterstützt · „- [ ] “ für Aufgaben · Strg/Cmd+Enter zum Speichern', en: 'Markdown supported · “- [ ] ” for tasks · Ctrl/Cmd+Enter to save' },
+    toggleTask: { de: 'Aufgabe abhaken', en: 'Toggle task' },
+    resizePane: { de: 'Ziehen: Höhe ändern · Doppelklick: Standardhöhe', en: 'Drag: resize · Double-click: default height' },
     viewOnlyHint: { de: 'Nur-Lesen-Ansicht', en: 'View-only' },
   },
 
@@ -439,6 +448,31 @@ export const translations = {
     sat: { de: 'Sa', en: 'Sa' },
     sun: { de: 'So', en: 'Su' },
   },
+
+  // Document metadata. English is the source language.
+  meta: {
+    title: { de: 'Planvas – Ressourcenplanung', en: 'Planvas – Resource Planning' },
+    description: { de: 'Visuelles Werkzeug zur Ressourcen- und Projektplanung', en: 'Visual tool for resource and project planning' },
+  },
+
+  // Canonical error messages. Code throws the English string; the UI translates it.
+  errors: {
+    invalidShareLink: { de: 'Ungültiger Freigabe-Link', en: 'Invalid share link' },
+    shareLinkDisabled: { de: 'Freigabe-Link ungültig oder deaktiviert', en: 'Share link is invalid or has been disabled' },
+    notAuthenticated: { de: 'Nicht angemeldet', en: 'Not authenticated' },
+    noProjectPermission: {
+      de: 'Keine Berechtigung für dieses Projekt. Bitte den Projektbesitzer um Freigabe bitten.',
+      en: 'You do not have permission for this project. Please ask the project owner for access.',
+    },
+    userAlreadyExists: { de: 'Ein Benutzer existiert bereits. Bitte melde dich an.', en: 'A user already exists. Please sign in.' },
+    emailInUse: { de: 'Diese E-Mail-Adresse wird bereits verwendet. Bitte melde dich an.', en: 'This email address is already in use. Please sign in.' },
+    loadFailed: { de: 'Fehler beim Laden', en: 'Failed to load' },
+    createFailed: { de: 'Fehler beim Erstellen', en: 'Failed to create' },
+    updateFailed: { de: 'Fehler beim Aktualisieren', en: 'Failed to update' },
+    deleteFailed: { de: 'Fehler beim Löschen', en: 'Failed to delete' },
+    saveFailed: { de: 'Fehler beim Speichern', en: 'Failed to save' },
+    liveSyncFailed: { de: 'Live-Sync konnte nicht aktiviert werden', en: 'Live sync could not be enabled' },
+  },
 } as const
 
 // Type for translation keys
@@ -459,7 +493,27 @@ export function t(
   return translation[lang] || translation.en || key
 }
 
-// Locale string for date formatting
+export type ErrorKey = keyof typeof translations.errors
+
+/** English source text for an application error. Throw this; translate at the UI. */
+export function errorText(key: ErrorKey): string {
+  return translations.errors[key].en
+}
+
+const errorKeyByEnglish = new Map<string, ErrorKey>(
+  (Object.keys(translations.errors) as ErrorKey[]).map((key) => [translations.errors[key].en, key])
+)
+
+/** Translate a known English error message. Unknown text is returned unchanged. */
+export function translateErrorMessage(
+  message: string,
+  translate: (category: keyof TranslationKeys, key: string) => string
+): string {
+  const key = errorKeyByEnglish.get(message)
+  return key ? translate('errors', key) : message
+}
+
+// Locale string for date formatting. English is the fallback.
 export function getDateLocaleString(lang: Language): string {
   return lang === 'de' ? 'de-DE' : 'en-US'
 }

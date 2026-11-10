@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 /**
- * TinyPlanvas - Initial Collections Migration
+ * Planvas - Initial Collections Migration
  * 
  * PocketBase 0.36+ compatible migration.
  */
@@ -192,7 +192,7 @@ migrate((app) => {
   app.save(allocations);
   console.log("✅ Created allocations collection");
 
-  console.log("🎉 TinyPlanvas collections created successfully!");
+  console.log("🎉 Planvas collections created successfully!");
 
 }, (app) => {
   // Rollback

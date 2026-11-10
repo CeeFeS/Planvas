@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 /**
- * TinyPlanvas - Authentication & Permissions Collections
+ * Planvas - Authentication & Permissions Collections
  * 
  * PocketBase 0.36+ compatible migration.
  * 

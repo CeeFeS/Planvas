@@ -22,6 +22,7 @@ import {
   generateNextSubtaskDisplayId,
 } from '@/lib/utils'
 import * as api from '@/lib/pocketbase-api'
+import { errorText } from '@/lib/i18n'
 import type { RecordSubscription } from 'pocketbase'
 
 // ==================== State Types ====================
@@ -408,7 +409,7 @@ export const useProjectStore = create<ProjectStore>()(
       } catch (error) {
         set((state) => {
           state.isLoading = false
-          state.error = error instanceof Error ? error.message : 'Fehler beim Laden'
+          state.error = error instanceof Error ? error.message : errorText('loadFailed')
         })
         throw error
       }
@@ -489,7 +490,7 @@ export const useProjectStore = create<ProjectStore>()(
             state.resources,
             state.allocations
           )
-          state.error = error instanceof Error ? error.message : 'Fehler beim Erstellen'
+          state.error = error instanceof Error ? error.message : errorText('createFailed')
         })
         throw error
       }
@@ -532,7 +533,7 @@ export const useProjectStore = create<ProjectStore>()(
           get().updateTask(id, originalTask)
         }
         set((state) => {
-          state.error = error instanceof Error ? error.message : 'Fehler beim Aktualisieren'
+          state.error = error instanceof Error ? error.message : errorText('updateFailed')
         })
         throw error
       }
@@ -684,7 +685,7 @@ export const useProjectStore = create<ProjectStore>()(
               state.resources,
               state.allocations
             )
-            state.error = error instanceof Error ? error.message : 'Fehler beim Löschen'
+            state.error = error instanceof Error ? error.message : errorText('deleteFailed')
           })
         }
         throw error
@@ -755,7 +756,7 @@ export const useProjectStore = create<ProjectStore>()(
             state.resources,
             state.allocations
           )
-          state.error = error instanceof Error ? error.message : 'Fehler beim Erstellen'
+          state.error = error instanceof Error ? error.message : errorText('createFailed')
         })
         throw error
       }
@@ -786,7 +787,7 @@ export const useProjectStore = create<ProjectStore>()(
           get().updateResource(id, originalResource)
         }
         set((state) => {
-          state.error = error instanceof Error ? error.message : 'Fehler beim Aktualisieren'
+          state.error = error instanceof Error ? error.message : errorText('updateFailed')
         })
         throw error
       }
@@ -829,7 +830,7 @@ export const useProjectStore = create<ProjectStore>()(
               state.resources,
               state.allocations
             )
-            state.error = error instanceof Error ? error.message : 'Fehler beim Löschen'
+            state.error = error instanceof Error ? error.message : errorText('deleteFailed')
           })
         }
         throw error
@@ -898,7 +899,7 @@ export const useProjectStore = create<ProjectStore>()(
         })
       } catch (error) {
         set((state) => {
-          state.error = error instanceof Error ? error.message : 'Fehler beim Speichern'
+          state.error = error instanceof Error ? error.message : errorText('saveFailed')
         })
         // Note: We don't rollback allocation changes since user may continue painting
       }
@@ -944,7 +945,7 @@ export const useProjectStore = create<ProjectStore>()(
               state.resources,
               state.allocations
             )
-            state.error = error instanceof Error ? error.message : 'Fehler beim Löschen'
+            state.error = error instanceof Error ? error.message : errorText('deleteFailed')
           })
         }
       }
@@ -992,7 +993,7 @@ export const useProjectStore = create<ProjectStore>()(
               if (patch.name !== undefined) state.customColumns[idx].name = original.name
               if (patch.width !== undefined) state.customColumns[idx].width = original.width
             }
-            state.error = error instanceof Error ? error.message : 'Fehler beim Aktualisieren'
+            state.error = error instanceof Error ? error.message : errorText('updateFailed')
           })
         }
       }
@@ -1015,7 +1016,7 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => {
           state.customColumns = originalColumns
           state.customValues = originalValues
-          state.error = error instanceof Error ? error.message : 'Fehler beim Löschen'
+          state.error = error instanceof Error ? error.message : errorText('deleteFailed')
         })
       }
     },
@@ -1066,7 +1067,7 @@ export const useProjectStore = create<ProjectStore>()(
             cv => !(cv.column_id === columnId && cv.row_type === rowType && cv.row_id === rowId)
           )
           if (original) state.customValues.push(original)
-          state.error = error instanceof Error ? error.message : 'Fehler beim Speichern'
+          state.error = error instanceof Error ? error.message : errorText('saveFailed')
         })
       }
     },
@@ -1331,7 +1332,7 @@ export const useProjectStore = create<ProjectStore>()(
       } catch (error) {
         console.error('Failed to subscribe to project changes:', error)
         set((s) => {
-          s.error = 'Live-Sync konnte nicht aktiviert werden'
+          s.error = errorText('liveSyncFailed')
         })
       }
     },

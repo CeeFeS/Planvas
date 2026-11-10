@@ -38,7 +38,15 @@ import {
   CustomValueEditor,
   type CustomCellEditTarget,
 } from './custom-column-cell'
-import { ColumnFilter } from './column-filter'
+import { ColumnFilter, matchesColumnFilter, type ColumnFilterSelection } from './column-filter'
+import {
+  autoTaskColumnWidth,
+  autoResourceColumnWidth,
+  autoCustomColumnWidth,
+  resetTextMeasureCache,
+  type TaskNameEntry,
+  type ResourceNameEntry,
+} from '@/lib/column-autosize'
 
 // ==================== Time Window Configuration ====================
 
@@ -117,9 +125,12 @@ interface ColumnResizerProps {
   onResize: (delta: number) => void
   /** Called once when the drag ends (mouse up) - useful for persisting the width. */
   onResizeEnd?: () => void
+  /** Double-click: return the column to its automatic (content-based) width. */
+  onAutoSize?: () => void
+  title?: string
 }
 
-function ColumnResizer({ onResize, onResizeEnd }: ColumnResizerProps) {
+function ColumnResizer({ onResize, onResizeEnd, onAutoSize, title }: ColumnResizerProps) {
   const [isDragging, setIsDragging] = useState(false)
   const startXRef = useRef(0)
   // Keep latest callbacks in refs so the drag effect never resubscribes mid-drag,
@@ -169,6 +180,16 @@ function ColumnResizer({ onResize, onResizeEnd }: ColumnResizerProps) {
         isDragging && 'bg-ink-blue/50'
       )}
       onMouseDown={handleMouseDown}
+      onDoubleClick={
+        onAutoSize
+          ? (e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onAutoSize()
+            }
+          : undefined
+      }
+      title={title}
     >
       <div 
         className={cn(
@@ -186,9 +207,11 @@ function ColumnResizer({ onResize, onResizeEnd }: ColumnResizerProps) {
 // ==================== Main Planning Grid ====================
 
 const ID_COLUMN_WIDTH = 48 // Fixed width for ID column
-const MIN_TASK_WIDTH = 40
+const MIN_TASK_WIDTH = 40 // Narrowest when resizing by hand
 const MIN_RESOURCE_WIDTH = 40
-const DEFAULT_TASK_WIDTH = 180
+const MIN_AUTO_TASK_WIDTH = 120 // Narrowest automatic width
+const MIN_AUTO_RESOURCE_WIDTH = 110
+const DEFAULT_TASK_WIDTH = 180 // Used until the first measurement on the client
 const DEFAULT_RESOURCE_WIDTH = 160
 const START_COLUMN_WIDTH = 88  // Start (yyyy-mm-dd)
 const END_COLUMN_WIDTH = 88    // End (yyyy-mm-dd)
@@ -196,22 +219,22 @@ const SUM_COLUMN_WIDTH = 56    // Σ (Sum)
 const MIN_ALLOCATION_WIDTH = 56 // Min allocation
 const MAX_ALLOCATION_WIDTH = 56 // Max allocation
 const MIN_SLOT_WIDTH = 28 // Narrowest a time-slot column may get before the grid scrolls
-const CUSTOM_COL_WIDTH = 180 // Default custom column width (fallback when unset)
+const CUSTOM_COL_WIDTH = 180 // Custom column width until the content was measured
 const MIN_CUSTOM_COL_WIDTH = 100 // Min custom column width when resizing
 const MAX_CUSTOM_COL_WIDTH = 600 // Max custom column width when resizing
 const ADD_COL_WIDTH = 44 // "Add column" control width
 
 /**
- * Frozen columns (task/resource) must not eat the whole screen on small
- * monitors - every pixel they take is one the time slots cannot use, which is
- * what pushes the allocation chips into a horizontal scroll. The widths follow
- * the viewport until the user resizes a column by hand.
+ * Upper bounds for the automatic width of the frozen columns (task/resource).
+ * They size to their content, but must not eat the whole screen on small
+ * monitors - every pixel they take is one the time slots cannot use. Longer
+ * names are truncated; dragging the column edge still allows any width.
  */
-function responsiveColumnWidths(viewportWidth: number): { task: number; resource: number } {
-  if (viewportWidth < 1024) return { task: 112, resource: 96 }
-  if (viewportWidth < 1280) return { task: 132, resource: 112 }
-  if (viewportWidth < 1600) return { task: 156, resource: 132 }
-  return { task: DEFAULT_TASK_WIDTH, resource: DEFAULT_RESOURCE_WIDTH }
+function frozenColumnCaps(viewportWidth: number): { task: number; resource: number } {
+  return {
+    task: Math.round(Math.min(480, Math.max(160, viewportWidth * 0.3))),
+    resource: Math.round(Math.min(360, Math.max(140, viewportWidth * 0.22))),
+  }
 }
 
 export function PlanningGrid() {
@@ -251,22 +274,95 @@ export function PlanningGrid() {
   const showAddColumn = hasEditPermission
   const extraColCount = sortedCustomColumns.length + (showAddColumn ? 1 : 0)
 
+  // ==================== Automatic column widths ====================
+  // Text is measured on the client only (canvas). `measureVersion` is 0 until
+  // mounted and bumps once the web fonts are ready, so widths are measured with
+  // the real font instead of the fallback.
+  const [measureVersion, setMeasureVersion] = useState(0)
+  const [viewportWidth, setViewportWidth] = useState(1600)
+
+  useEffect(() => {
+    let cancelled = false
+    setMeasureVersion(1)
+    document.fonts?.ready
+      .then(() => {
+        if (cancelled) return
+        resetTextMeasureCache()
+        setMeasureVersion((v) => v + 1)
+      })
+      .catch(() => {})
+
+    const onResize = () => setViewportWidth(window.innerWidth)
+    onResize()
+    window.addEventListener('resize', onResize)
+    return () => {
+      cancelled = true
+      window.removeEventListener('resize', onResize)
+    }
+  }, [])
+
+  // Content-based width per custom column. A persisted `col.width` (> 0) is a
+  // manual width and wins; 0/unset means "automatic".
+  const emptyCellLabel = t('customColumns', 'empty')
+  const autoCustomWidths = useMemo(() => {
+    const map = new Map<string, number>()
+    if (measureVersion === 0) return map
+    const valuesByColumn = new Map<string, string[]>()
+    for (const cv of customValues) {
+      const list = valuesByColumn.get(cv.column_id)
+      if (list) list.push(cv.value)
+      else valuesByColumn.set(cv.column_id, [cv.value])
+    }
+    for (const col of sortedCustomColumns) {
+      map.set(
+        col.id,
+        autoCustomColumnWidth({
+          values: valuesByColumn.get(col.id) ?? [],
+          headerLabel: col.name,
+          canEdit: hasEditPermission,
+          emptyLabel: emptyCellLabel,
+          min: MIN_CUSTOM_COL_WIDTH,
+          max: MAX_CUSTOM_COL_WIDTH,
+        })
+      )
+    }
+    return map
+  }, [measureVersion, customValues, sortedCustomColumns, hasEditPermission, emptyCellLabel])
+
+  // Effective (manual or automatic) width per custom column. Rows read this
+  // map; the live drag override below only touches the <colgroup>, so dragging
+  // never re-renders the rows.
+  const customColWidths = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const col of sortedCustomColumns) {
+      map.set(
+        col.id,
+        col.width && col.width > 0 ? col.width : (autoCustomWidths.get(col.id) ?? CUSTOM_COL_WIDTH)
+      )
+    }
+    return map
+  }, [sortedCustomColumns, autoCustomWidths])
+  const customColWidthsRef = useRef(customColWidths)
+  customColWidthsRef.current = customColWidths
+
   // Live width override for the custom column currently being dragged.
-  // Only the actively-resized column lives here; everything else reads the
-  // persisted `col.width`. This keeps the drag smooth without touching the DB
-  // on every mouse move (persist happens once on drag end).
+  // Only the actively-resized column lives here. This keeps the drag smooth
+  // without touching the DB on every mouse move (persist happens once on drag end).
   const [resizingCol, setResizingCol] = useState<{ id: string; width: number } | null>(null)
 
   const getColWidth = useCallback(
     (col: CustomColumn) =>
-      resizingCol?.id === col.id ? resizingCol.width : (col.width ?? CUSTOM_COL_WIDTH),
-    [resizingCol]
+      resizingCol?.id === col.id
+        ? resizingCol.width
+        : (customColWidths.get(col.id) ?? CUSTOM_COL_WIDTH),
+    [resizingCol, customColWidths]
   )
 
   const handleCustomColResize = useCallback(
     (col: CustomColumn) => (delta: number) => {
       setResizingCol((prev) => {
-        const base = prev?.id === col.id ? prev.width : (col.width ?? CUSTOM_COL_WIDTH)
+        const base =
+          prev?.id === col.id ? prev.width : (customColWidthsRef.current.get(col.id) ?? CUSTOM_COL_WIDTH)
         const next = Math.min(MAX_CUSTOM_COL_WIDTH, Math.max(MIN_CUSTOM_COL_WIDTH, base + delta))
         return { id: col.id, width: next }
       })
@@ -279,12 +375,22 @@ export function PlanningGrid() {
       setResizingCol((prev) => {
         if (prev && prev.id === col.id) {
           const finalWidth = Math.round(prev.width)
-          if (finalWidth !== (col.width ?? CUSTOM_COL_WIDTH)) {
+          if (finalWidth !== customColWidthsRef.current.get(col.id)) {
             updateCustomColumnAsync(col.id, { width: finalWidth }).catch(console.error)
           }
         }
         return null
       })
+    },
+    [updateCustomColumnAsync]
+  )
+
+  // Double-click on the column edge: back to the automatic width
+  const handleCustomColAutoSize = useCallback(
+    (col: CustomColumn) => () => {
+      if (col.width && col.width > 0) {
+        updateCustomColumnAsync(col.id, { width: 0 }).catch(console.error)
+      }
     },
     [updateCustomColumnAsync]
   )
@@ -328,6 +434,16 @@ export function PlanningGrid() {
     [editingCustomCell, handleSetCustomValue]
   )
 
+  // Save without closing the editor (e.g. a task ticked in the rendered view)
+  const handlePersistCustomCell = useCallback(
+    (value: string) => {
+      if (!editingCustomCell) return
+      const { column, rowType, rowId } = editingCustomCell
+      handleSetCustomValue(column.id, rowType, rowId, value)
+    },
+    [editingCustomCell, handleSetCustomValue]
+  )
+
   const extraColsWidth =
     sortedCustomColumns.reduce((sum, col) => sum + getColWidth(col), 0) +
     (showAddColumn ? ADD_COL_WIDTH : 0)
@@ -349,10 +465,11 @@ export function PlanningGrid() {
   const gridHeadRow1Ref = useRef<HTMLTableRowElement>(null)
   const summaryHeadRow1Ref = useRef<HTMLTableRowElement>(null)
 
-  // Per-column filters (empty set = no filter for that column). Custom columns
-  // are intentionally not filterable.
-  const [taskFilter, setTaskFilter] = useState<Set<string>>(new Set())
-  const [resourceFilter, setResourceFilter] = useState<Set<string>>(new Set())
+  // Per-column filters (null = no filter for that column, otherwise the set of
+  // values to show - an empty set hides everything, like in Excel). Custom
+  // columns are intentionally not filterable.
+  const [taskFilter, setTaskFilter] = useState<ColumnFilterSelection>(null)
+  const [resourceFilter, setResourceFilter] = useState<ColumnFilterSelection>(null)
   
   // Time window navigation offset (0 = first window)
   const [timeWindowOffset, setTimeWindowOffset] = useState(0)
@@ -362,24 +479,67 @@ export function PlanningGrid() {
   // Min allocation per resource name (default 0%)
   const [minAllocationByResource, setMinAllocationByResource] = useState<Map<string, number>>(new Map())
   
-  // Column widths state - start at the desktop defaults (SSR-safe) and adapt to
-  // the actual viewport in the effect below.
-  const [taskColumnWidth, setTaskColumnWidth] = useState(DEFAULT_TASK_WIDTH)
-  const [resourceColumnWidth, setResourceColumnWidth] = useState(DEFAULT_RESOURCE_WIDTH)
-  // Once a column was dragged, the user's width wins over the responsive one.
-  const hasManualColumnWidth = useRef(false)
+  // Task/resource column widths follow their content (see column-autosize)
+  // until the user drags a column edge; a double-click on the edge returns the
+  // column to its automatic width. Manual widths last for the session.
+  const [manualTaskWidth, setManualTaskWidth] = useState<number | null>(null)
+  const [manualResourceWidth, setManualResourceWidth] = useState<number | null>(null)
 
-  useEffect(() => {
-    const applyResponsiveWidths = () => {
-      if (hasManualColumnWidth.current) return
-      const { task, resource } = responsiveColumnWidths(window.innerWidth)
-      setTaskColumnWidth(task)
-      setResourceColumnWidth(resource)
+  const taskHeaderLabel = t('grid', 'task')
+  const resourceHeaderLabel = t('grid', 'resource')
+  const hasTaskFilter = taskFilter !== null
+  const hasResourceFilter = resourceFilter !== null
+
+  const { autoTaskWidth, autoResourceWidth } = useMemo(() => {
+    if (measureVersion === 0) {
+      return { autoTaskWidth: DEFAULT_TASK_WIDTH, autoResourceWidth: DEFAULT_RESOURCE_WIDTH }
     }
-    applyResponsiveWidths()
-    window.addEventListener('resize', applyResponsiveWidths)
-    return () => window.removeEventListener('resize', applyResponsiveWidths)
-  }, [])
+    const tasks: TaskNameEntry[] = []
+    const resources: ResourceNameEntry[] = []
+    for (const task of tasksWithData) {
+      tasks.push({ name: task.name, isSubtask: false })
+      for (const r of task.resources) resources.push({ name: r.name, indent: false })
+      for (const child of task.children) {
+        tasks.push({ name: child.name, isSubtask: true })
+        for (const r of child.resources) resources.push({ name: r.name, indent: true })
+      }
+    }
+    const caps = frozenColumnCaps(viewportWidth)
+    return {
+      autoTaskWidth: autoTaskColumnWidth({
+        tasks,
+        headerLabel: taskHeaderLabel,
+        canEdit: hasEditPermission,
+        hasFilter: hasTaskFilter,
+        min: Math.min(MIN_AUTO_TASK_WIDTH, caps.task),
+        max: caps.task,
+      }),
+      autoResourceWidth: autoResourceColumnWidth({
+        resources,
+        headerLabel: resourceHeaderLabel,
+        canEdit: hasEditPermission,
+        hasFilter: hasResourceFilter,
+        min: Math.min(MIN_AUTO_RESOURCE_WIDTH, caps.resource),
+        max: caps.resource,
+      }),
+    }
+  }, [
+    measureVersion,
+    tasksWithData,
+    viewportWidth,
+    taskHeaderLabel,
+    resourceHeaderLabel,
+    hasEditPermission,
+    hasTaskFilter,
+    hasResourceFilter,
+  ])
+
+  const taskColumnWidth = manualTaskWidth ?? autoTaskWidth
+  const resourceColumnWidth = manualResourceWidth ?? autoResourceWidth
+  const taskColumnWidthRef = useRef(taskColumnWidth)
+  taskColumnWidthRef.current = taskColumnWidth
+  const resourceColumnWidthRef = useRef(resourceColumnWidth)
+  resourceColumnWidthRef.current = resourceColumnWidth
 
   // Calculate sticky positions
   const taskColumnLeft = ID_COLUMN_WIDTH
@@ -534,8 +694,8 @@ export function PlanningGrid() {
     }
 
     const all = Array.from(groupedByName.values()).sort((a, b) => a.name.localeCompare(b.name))
-    // Apply resource filter (empty set = show all)
-    if (resourceFilter.size === 0) return all
+    // Apply resource filter (null = show all)
+    if (resourceFilter === null) return all
     return all.filter((g) => resourceFilter.has(g.name))
   }, [project, tasksWithData, resourceFilter])
 
@@ -608,22 +768,22 @@ export function PlanningGrid() {
     }
   }, [tasksWithData])
 
-  const anyResourceLevelFilter = resourceFilter.size > 0
+  const anyResourceLevelFilter = resourceFilter !== null
 
   // Tasks with all active column filters applied. Resource-level filters reduce
   // each task's resources (aggregates recomputed); tasks without any remaining
   // resource - or not matching the task filter - are hidden.
   // Parent matches if itself or any child matches the task name filter.
   const filteredTasks = useMemo(() => {
-    if (taskFilter.size === 0 && !anyResourceLevelFilter) return tasksWithData
+    if (taskFilter === null && !anyResourceLevelFilter) return tasksWithData
 
     const applyResourceFilter = (task: TaskWithAggregation): TaskWithAggregation | null => {
       if (!anyResourceLevelFilter) return task
-      const resources = task.resources.filter((r) => resourceFilter.has(r.name))
+      const resources = task.resources.filter((r) => matchesColumnFilter(resourceFilter, r.name))
       if (resources.length === 0 && task.children.length === 0) return null
       const filteredChildren: TaskWithAggregation[] = []
       for (const child of task.children) {
-        const childResources = child.resources.filter((r) => resourceFilter.has(r.name))
+        const childResources = child.resources.filter((r) => matchesColumnFilter(resourceFilter, r.name))
         if (childResources.length === 0) continue
         filteredChildren.push({
           ...child,
@@ -644,11 +804,11 @@ export function PlanningGrid() {
 
     const result: TaskWithAggregation[] = []
     for (const task of tasksWithData) {
-      const selfMatch = taskFilter.size === 0 || taskFilter.has(task.name)
+      const selfMatch = matchesColumnFilter(taskFilter, task.name)
       const matchingChildren =
-        taskFilter.size === 0
+        taskFilter === null
           ? task.children
-          : task.children.filter((c) => taskFilter.has(c.name))
+          : task.children.filter((c) => matchesColumnFilter(taskFilter, c.name))
 
       if (!selfMatch && matchingChildren.length === 0) continue
 
@@ -671,16 +831,17 @@ export function PlanningGrid() {
     return result
   }, [tasksWithData, taskFilter, resourceFilter, anyResourceLevelFilter])
 
-  // Handle column resize
+  // Handle column resize (a dragged width wins over the automatic one)
   const handleTaskColumnResize = useCallback((delta: number) => {
-    hasManualColumnWidth.current = true
-    setTaskColumnWidth(w => Math.max(MIN_TASK_WIDTH, w + delta))
+    setManualTaskWidth(w => Math.max(MIN_TASK_WIDTH, (w ?? taskColumnWidthRef.current) + delta))
   }, [])
 
   const handleResourceColumnResize = useCallback((delta: number) => {
-    hasManualColumnWidth.current = true
-    setResourceColumnWidth(w => Math.max(MIN_RESOURCE_WIDTH, w + delta))
+    setManualResourceWidth(w => Math.max(MIN_RESOURCE_WIDTH, (w ?? resourceColumnWidthRef.current) + delta))
   }, [])
+
+  const handleTaskColumnAutoSize = useCallback(() => setManualTaskWidth(null), [])
+  const handleResourceColumnAutoSize = useCallback(() => setManualResourceWidth(null), [])
 
   // Toggle task expansion
   const toggleTask = useCallback((taskId: string) => {
@@ -1049,7 +1210,11 @@ export function PlanningGrid() {
                     </button>
                   </div>
                 </div>
-                <ColumnResizer onResize={handleTaskColumnResize} />
+                <ColumnResizer
+                  onResize={handleTaskColumnResize}
+                  onAutoSize={handleTaskColumnAutoSize}
+                  title={t('grid', 'autoWidthHint')}
+                />
               </th>
               <th 
                 className="planvas-freeze-edge sticky bg-paper-cream z-30 border-r border-paper-lines text-left px-3 py-2 relative"
@@ -1064,7 +1229,11 @@ export function PlanningGrid() {
                     onChange={setResourceFilter}
                   />
                 </div>
-                <ColumnResizer onResize={handleResourceColumnResize} />
+                <ColumnResizer
+                  onResize={handleResourceColumnResize}
+                  onAutoSize={handleResourceColumnAutoSize}
+                  title={t('grid', 'autoWidthHint')}
+                />
               </th>
               <th className="bg-paper-cream z-10 border-r border-paper-lines text-center px-2 py-2 whitespace-nowrap">
                 <span className="font-hand text-xs text-ink-faded">{t('grid', 'start')}</span>
@@ -1090,6 +1259,8 @@ export function PlanningGrid() {
                       <ColumnResizer
                         onResize={handleCustomColResize(col)}
                         onResizeEnd={handleCustomColResizeEnd(col)}
+                        onAutoSize={handleCustomColAutoSize(col)}
+                        title={t('grid', 'autoWidthHint')}
                       />
                     ) : undefined
                   }
@@ -1226,9 +1397,25 @@ export function PlanningGrid() {
                 showAddColumn={showAddColumn}
                 getCustomValue={getCustomValue}
                 onOpenCustomCell={handleOpenCustomCell}
+                onChangeCustomValue={handleSetCustomValue}
+                customColWidths={customColWidths}
               />
             ))}
             
+            {/* Everything filtered away (e.g. "deselect all") */}
+            {filteredTasks.length === 0 && tasksWithData.length > 0 && (taskFilter !== null || resourceFilter !== null) && (
+              <tr>
+                <td
+                  colSpan={2}
+                  className="sticky bg-surface z-20 px-3 py-3"
+                  style={{ left: 0 }}
+                >
+                  <span className="text-sm text-ink-faded italic whitespace-nowrap">{t('grid', 'filterNoRows')}</span>
+                </td>
+                <td colSpan={4 + extraColCount + slotKeys.length} />
+              </tr>
+            )}
+
             {/* New Task Row - only show if user can edit */}
             {hasEditPermission && (
               <tr className="planvas-row-top hover:bg-paper-warm/50">
@@ -1470,10 +1657,15 @@ export function PlanningGrid() {
         <CustomValueEditor
           key={`${editingCustomCell.column.id}:${editingCustomCell.rowType}:${editingCustomCell.rowId}`}
           columnName={editingCustomCell.column.name}
-          initialValue={editingCustomCell.value}
+          initialValue={getCustomValue(
+            editingCustomCell.column.id,
+            editingCustomCell.rowType,
+            editingCustomCell.rowId
+          )}
           canEdit={editingCustomCell.canEdit}
           onCancel={() => setEditingCustomCell(null)}
           onSave={handleSaveCustomCell}
+          onPersist={handlePersistCustomCell}
         />
       )}
     </div>
@@ -1621,6 +1813,10 @@ interface TaskRowsProps {
   showAddColumn: boolean
   getCustomValue: (columnId: string, rowType: CustomRowType, rowId: string) => string
   onOpenCustomCell: (target: CustomCellEditTarget) => void
+  /** Direct save from the cell preview (e.g. ticking a "- [ ]" task). */
+  onChangeCustomValue: (columnId: string, rowType: CustomRowType, rowId: string, value: string) => void
+  /** Effective width per custom column id. */
+  customColWidths: Map<string, number>
   /** When true, render as nested subtask row (no further nesting). */
   isSubtask?: boolean
 }
@@ -1651,6 +1847,8 @@ function TaskRowsComponent({
   showAddColumn,
   getCustomValue,
   onOpenCustomCell,
+  onChangeCustomValue,
+  customColWidths,
   isSubtask = false,
 }: TaskRowsProps) {
   const { t } = useTranslation()
@@ -1807,7 +2005,7 @@ function TaskRowsComponent({
                   setEditingDisplayId(false)
                 }
               }}
-              className="input-notebook w-full text-center font-mono text-xs"
+              className="input-inline-edit w-full text-center font-mono text-xs"
               autoFocus
             />
           ) : (
@@ -1859,7 +2057,7 @@ function TaskRowsComponent({
                 onChange={e => setTaskName(e.target.value)}
                 onBlur={handleSaveTaskName}
                 onKeyDown={handleTaskNameKeyDown}
-                className={cn('input-notebook min-w-0 flex-1', !isSubtask && 'font-medium')}
+                className={cn('input-inline-edit text-ink text-left min-w-0 flex-1', !isSubtask && 'font-medium', isSubtask && 'text-sm')}
                 autoFocus
               />
             ) : (
@@ -1947,9 +2145,10 @@ function TaskRowsComponent({
             rowId={task.id}
             value={getCustomValue(col.id, 'task', task.id)}
             canEdit={canEdit}
-            width={col.width ?? CUSTOM_COL_WIDTH}
+            width={customColWidths.get(col.id) ?? CUSTOM_COL_WIDTH}
             variant={isSubtask ? 'resource' : 'task'}
             onOpen={onOpenCustomCell}
+            onChangeValue={onChangeCustomValue}
           />
         ))}
         {showAddColumn && <td className={cn('border-l border-paper-lines', rowBgSoft)} />}
@@ -2022,6 +2221,8 @@ function TaskRowsComponent({
                 showAddColumn={showAddColumn}
                 getCustomValue={getCustomValue}
                 onOpenCustomCell={onOpenCustomCell}
+                onChangeCustomValue={onChangeCustomValue}
+                customColWidths={customColWidths}
               />
             ))}
 
@@ -2101,6 +2302,8 @@ function TaskRowsComponent({
               showAddColumn={showAddColumn}
               getCustomValue={getCustomValue}
               onOpenCustomCell={onOpenCustomCell}
+              onChangeCustomValue={onChangeCustomValue}
+              customColWidths={customColWidths}
               indent={isSubtask}
             />
           ))}
@@ -2181,6 +2384,10 @@ interface ResourceRowProps {
   showAddColumn: boolean
   getCustomValue: (columnId: string, rowType: CustomRowType, rowId: string) => string
   onOpenCustomCell: (target: CustomCellEditTarget) => void
+  /** Direct save from the cell preview (e.g. ticking a "- [ ]" task). */
+  onChangeCustomValue: (columnId: string, rowType: CustomRowType, rowId: string, value: string) => void
+  /** Effective width per custom column id. */
+  customColWidths: Map<string, number>
   /** Extra indent when resource belongs to a subtask */
   indent?: boolean
 }
@@ -2202,6 +2409,8 @@ function ResourceRowComponent({
   showAddColumn,
   getCustomValue,
   onOpenCustomCell,
+  onChangeCustomValue,
+  customColWidths,
   indent = false,
 }: ResourceRowProps) {
   const { t } = useTranslation()
@@ -2283,7 +2492,7 @@ function ResourceRowComponent({
               onChange={e => setName(e.target.value)}
               onBlur={handleSaveName}
               onKeyDown={e => e.key === 'Enter' && handleSaveName()}
-              className="input-notebook text-sm min-w-0 flex-1"
+              className="input-inline-edit text-sm text-ink text-left min-w-0 flex-1"
               autoFocus
             />
           ) : (
@@ -2348,9 +2557,10 @@ function ResourceRowComponent({
           rowId={resource.id}
           value={getCustomValue(col.id, 'resource', resource.id)}
           canEdit={canEdit}
-          width={col.width ?? CUSTOM_COL_WIDTH}
+          width={customColWidths.get(col.id) ?? CUSTOM_COL_WIDTH}
           variant="resource"
           onOpen={onOpenCustomCell}
+          onChangeValue={onChangeCustomValue}
         />
       ))}
       {showAddColumn && <td className="border-l border-paper-lines" />}
@@ -2514,7 +2724,7 @@ function ResourceSummaryRowComponent({
             onChange={e => setMinInputValue(e.target.value)}
             onBlur={handleSaveMin}
             onKeyDown={e => e.key === 'Enter' && handleSaveMin()}
-            className="input-notebook w-full text-center font-mono text-xs"
+            className="input-inline-number text-center font-mono text-xs"
             autoFocus
             min={0}
           />
@@ -2541,7 +2751,7 @@ function ResourceSummaryRowComponent({
             onChange={e => setMaxInputValue(e.target.value)}
             onBlur={handleSaveMax}
             onKeyDown={e => e.key === 'Enter' && handleSaveMax()}
-            className="input-notebook w-full text-center font-mono text-xs"
+            className="input-inline-number text-center font-mono text-xs"
             autoFocus
             min={1}
           />

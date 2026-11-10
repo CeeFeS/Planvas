@@ -1,24 +1,42 @@
 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="tpBg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#40C463"/>
-      <stop offset="1" stop-color="#216E39"/>
+    <linearGradient id="pvBg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#34B254"/>
+      <stop offset="50%" stop-color="#216E39"/>
+      <stop offset="100%" stop-color="#113C20"/>
+    </linearGradient>
+    <linearGradient id="pvGold" x1="13" y1="13" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FEF08A"/>
+      <stop offset="45%" stop-color="#FACC15"/>
+      <stop offset="100%" stop-color="#EA580C"/>
     </linearGradient>
   </defs>
-  <rect x="1" y="1" width="30" height="30" rx="7" fill="url(#tpBg)"/>
-  <rect x="1.5" y="1.5" width="29" height="29" rx="6.5" fill="none" stroke="#ffffff" stroke-opacity="0.15"/>
-  <!-- Planning grid (paint-to-plan allocation chips) -->
+
+  <!-- Rounded Canvas Squircle -->
+  <rect x="1" y="1" width="30" height="30" rx="7.5" fill="url(#pvBg)"/>
+  <rect x="1.5" y="1.5" width="29" height="29" rx="7" fill="none" stroke="#FFFFFF" stroke-opacity="0.22"/>
+
+  <!-- Unpainted Ghost Grid Slots (Lower-Right Canvas Matrix) -->
+  <rect x="20.4" y="13.1" width="5.8" height="5.8" rx="1.7" fill="#FFFFFF" fill-opacity="0.12"/>
+  <rect x="13.1" y="20.4" width="5.8" height="5.8" rx="1.7" fill="#FFFFFF" fill-opacity="0.12"/>
+
+  <!-- 3-2-1 Allocation Chips Forming the "P" Monogram -->
+  <!-- Row 1: 100%, 90%, 70% Mint -->
+  <rect x="5.8"  y="5.8" width="5.8" height="5.8" rx="1.7" fill="#FFFFFF"/>
+  <rect x="13.1" y="5.8" width="5.8" height="5.8" rx="1.7" fill="#FFFFFF" fill-opacity="0.90"/>
+  <rect x="20.4" y="5.8" width="5.8" height="5.8" rx="1.7" fill="#9BE9A8"/>
+
+  <!-- Row 2: 95% Stem + Active Painted Golden-Amber Chip -->
+  <rect x="5.8"  y="13.1" width="5.8" height="5.8" rx="1.7" fill="#FFFFFF" fill-opacity="0.95"/>
+  <rect x="13.1" y="13.1" width="5.8" height="5.8" rx="1.7" fill="url(#pvGold)"/>
+
+  <!-- Row 3: Stem Leg of "P" -->
+  <rect x="5.8"  y="20.4" width="5.8" height="5.8" rx="1.7" fill="#9BE9A8"/>
+
+  <!-- Artist Paintbrush Painting the Center Golden Chip -->
   <g>
-    <rect x="7"  y="9"  width="5" height="5" rx="1.4" fill="#ffffff" fill-opacity="0.95"/>
-    <rect x="13.5" y="9"  width="5" height="5" rx="1.4" fill="#ffffff" fill-opacity="0.55"/>
-    <rect x="20" y="9"  width="5" height="5" rx="1.4" fill="#ffffff" fill-opacity="0.30"/>
-
-    <rect x="7"  y="15.5" width="5" height="5" rx="1.4" fill="#ffffff" fill-opacity="0.45"/>
-    <rect x="13.5" y="15.5" width="5" height="5" rx="1.4" fill="#ffffff" fill-opacity="0.9"/>
-    <rect x="20" y="15.5" width="5" height="5" rx="1.4" fill="#ffffff" fill-opacity="0.6"/>
-
-    <rect x="7"  y="22" width="5" height="5" rx="1.4" fill="#ffffff" fill-opacity="0.3"/>
-    <rect x="13.5" y="22" width="5" height="5" rx="1.4" fill="#ffffff" fill-opacity="0.5"/>
-    <rect x="20" y="22" width="5" height="5" rx="1.4" fill="#ffffff" fill-opacity="0.95"/>
+    <path d="M17.2 16.5 C19.2 16.0 21.4 17.0 22.3 18.8 L27.2 23.7 C28.1 24.6 28.1 26.1 27.2 27.0 C26.3 27.9 24.8 27.9 23.9 27.0 L19.0 22.1 C17.2 21.2 16.2 19.0 16.7 17.0 Z" fill="#123E21" fill-opacity="0.85"/>
+    <path d="M21.8 19.9 L26.7 24.8 C27.4 25.5 27.4 26.5 26.7 27.1 C26.1 27.7 25.1 27.7 24.4 27.1 L19.5 22.2 Z" fill="#FFFFFF"/>
+    <path d="M17.4 16.8 C19.2 16.4 21.2 17.3 21.8 19.0 C22.1 20.0 21.3 21.2 20.3 21.5 C18.5 21.9 16.9 20.4 17.0 18.4 C17.0 17.4 17.1 16.9 17.4 16.8 Z" fill="url(#pvGold)"/>
   </g>
 </svg>

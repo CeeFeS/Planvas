@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 /**
- * TinyPlanvas - Add optional parent_id to tasks (one-level subtasks)
+ * Planvas - Add optional parent_id to tasks (one-level subtasks)
  *
  * ADDITIVE & NON-DESTRUCTIVE:
  * - Adds optional self-relation `parent_id` on tasks (cascadeDelete when parent is removed).

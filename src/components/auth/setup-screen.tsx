@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react'
 import { Eye, EyeOff, Loader2, AlertCircle, Shield, Sparkles } from 'lucide-react'
 import { useTranslation } from '@/lib/language-context'
+import { translateErrorMessage } from '@/lib/i18n'
 import * as api from '@/lib/pocketbase-api'
+import { PlanvasLogo } from '@/components/ui/planvas-logo'
 
 interface SetupScreenProps {
   onSetupComplete: () => void
@@ -112,7 +114,7 @@ export function SetupScreen({ onSetupComplete }: SetupScreenProps) {
         errorMessage += ` (Status: ${pbError.status})`
       }
       
-      setError(errorMessage)
+      setError(translateErrorMessage(errorMessage, t))
     } finally {
       setIsLoading(false)
     }
@@ -162,20 +164,7 @@ export function SetupScreen({ onSetupComplete }: SetupScreenProps) {
           <div className="text-center mb-8 relative">
             {/* Logo with sparkle */}
             <div className="relative inline-block mb-4">
-              <div className="w-20 h-20 mx-auto rounded-xl bg-gradient-to-br from-chip-green-200 to-chip-green-400 flex items-center justify-center shadow-lg">
-                <svg 
-                  viewBox="0 0 24 24" 
-                  className="w-12 h-12 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                >
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <line x1="8" y1="8" x2="16" y2="8" />
-                  <line x1="8" y1="12" x2="14" y2="12" />
-                  <line x1="8" y1="16" x2="12" y2="16" />
-                </svg>
-              </div>
+              <PlanvasLogo size={80} className="mx-auto drop-shadow-lg" />
               <Sparkles 
                 size={24} 
                 className="absolute -top-2 -right-2 text-yellow-400 animate-pulse" 

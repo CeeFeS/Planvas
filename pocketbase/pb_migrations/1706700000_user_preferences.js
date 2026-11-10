@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 /**
- * TinyPlanvas - Add "preferences" JSON field to the users collection
+ * Planvas - Add "preferences" JSON field to the users collection
  *
  * ADDITIVE & NON-DESTRUCTIVE:
  * - Adds an optional "json" field `preferences` ONLY if it does not exist yet.

@@ -30,8 +30,8 @@ const jetbrainsMono = localFont({
 })
 
 export const metadata: Metadata = {
-  title: 'TinyPlanvas - Ressourcen-Planung',
-  description: 'Visuelles Tool zur Ressourcen- und Projektplanung',
+  title: 'Planvas – Resource Planning',
+  description: 'Visual tool for resource and project planning',
 }
 
 export default function RootLayout({
@@ -41,7 +41,7 @@ export default function RootLayout({
 }) {
   return (
     <html 
-      lang="de" 
+      lang="en" 
       className={`${sourceSerif.variable} ${sourceSans.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >

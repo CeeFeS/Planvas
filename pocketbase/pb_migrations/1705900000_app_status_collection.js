@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 /**
- * TinyPlanvas - App Status Collection
+ * Planvas - App Status Collection
  * 
  * This collection stores the application setup status.
  * It is publicly readable (no authentication required) to allow

@@ -1,51 +1,48 @@
-# TinyPlanvas - PocketBase Backend
+# Planvas - PocketBase Backend
 
-Dieses Verzeichnis enthält das PocketBase-Backend für TinyPlanvas.
+This directory contains the PocketBase backend for Planvas.
 
 ## Quick Start
 
-### 1. PocketBase starten
+### 1. Start PocketBase
 
 ```bash
-# Vom Projekt-Root:
+# From the project root. Publishes PocketBase on http://127.0.0.1:8090
 npm run pocketbase:start
-
-# Oder direkt:
-docker compose up -d pocketbase
 ```
 
-### 2. Admin-Account erstellen
+### 2. Create an admin account
 
-1. Öffne http://127.0.0.1:8090/_/
-2. Erstelle einen Admin-Account beim ersten Besuch
-3. Die Collections werden automatisch durch Migrations angelegt!
+1. Open http://127.0.0.1:8090/_/
+2. Create an admin account on the first visit
+3. Collections are created automatically by migrations
 
-### 3. Frontend starten
+### 3. Start the frontend
 
 ```bash
 npm run dev
 ```
 
-Die App ist unter http://localhost:3000 erreichbar.
+The app is available at http://localhost:3000.
 
 ## Collections
 
-Die folgenden Collections werden automatisch erstellt:
+The following collections are created automatically:
 
-| Collection | Beschreibung |
-|------------|--------------|
-| `projects` | Haupt-Projekte |
-| `tasks` | Aufgaben innerhalb eines Projekts |
-| `resources` | Ressourcen, die Aufgaben zugeordnet sind |
-| `allocations` | Zeit-basierte Ressourcen-Zuweisungen |
+| Collection | Description |
+|------------|-------------|
+| `projects` | Top-level projects |
+| `tasks` | Tasks inside a project |
+| `resources` | Resources assigned to tasks |
+| `allocations` | Time-based resource assignments |
 
-## API-Regeln
+## API rules
 
-Standardmäßig sind alle Collections für alle Benutzer les- und schreibbar (für Entwicklung).
+By default every collection is readable and writable by every user (for development).
 
-**Für Produktion sollten die Regeln angepasst werden!**
+**Tighten the rules before production.**
 
-Beispiel für projektbasierte Zugriffskontrolle:
+Example of project-based access control:
 ```
 listRule: @request.auth.id != ""
 createRule: @request.auth.id != ""
@@ -55,32 +52,32 @@ deleteRule: @request.auth.id = user_id
 
 ## Realtime
 
-PocketBase bietet automatisch Realtime-Updates über WebSockets.
-Die App nutzt diese für Live-Synchronisierung zwischen Benutzern.
+PocketBase provides realtime updates over WebSockets.
+The app uses them to keep users in sync.
 
-## Befehle
+## Commands
 
 ```bash
-# PocketBase starten
+# Start PocketBase
 npm run pocketbase:start
 
-# PocketBase stoppen
+# Stop PocketBase
 npm run pocketbase:stop
 
-# Logs anzeigen
+# Show logs
 npm run pocketbase:logs
 
-# Container komplett entfernen (inkl. Daten)
+# Remove the container completely (including data)
 docker compose down -v
 ```
 
-## Daten-Persistenz
+## Data persistence
 
-Daten werden im Docker Volume `tinyplanvas_pocketbase_data` gespeichert.
+Data is stored in the Docker volume `tinyplanvas_pocketbase_data`.
 
-Um Daten zu sichern:
+To back it up:
 ```bash
-docker cp tinyplanvas-pocketbase:/pb/pb_data ./backup_pb_data
+docker cp planvas-pocketbase:/pb/pb_data ./backup_pb_data
 ```
 
 ## Ports

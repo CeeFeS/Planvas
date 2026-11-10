@@ -2,7 +2,7 @@ services:
   # Reverse Proxy - single entry point
   nginx:
     image: nginx:alpine
-    container_name: tinyplanvas-nginx
+    container_name: planvas-nginx
     restart: unless-stopped
     ports:
       - "${APP_PORT:-80}:80"
@@ -14,8 +14,8 @@ services:
       pocketbase:
         condition: service_healthy
     healthcheck:
-      # 127.0.0.1 statt localhost: nginx lauscht nur auf IPv4 (listen 80),
-      # localhost würde im Container auf IPv6 [::1] auflösen -> Connection refused.
+      # 127.0.0.1 instead of localhost: nginx listens on IPv4 only (listen 80).
+      # localhost would resolve to IPv6 [::1] inside the container and the check would fail.
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/api/health"]
       interval: 30s
       timeout: 10s
@@ -26,7 +26,7 @@ services:
     build:
       context: ./pocketbase
       dockerfile: Dockerfile
-    container_name: tinyplanvas-pocketbase
+    container_name: planvas-pocketbase
     restart: unless-stopped
     # No external port - only accessible through nginx
     expose:
@@ -54,7 +54,7 @@ services:
       args:
         # URL as seen from the browser - goes through nginx on same origin
         - NEXT_PUBLIC_POCKETBASE_URL=${NEXT_PUBLIC_POCKETBASE_URL:-}
-    container_name: tinyplanvas-frontend
+    container_name: planvas-frontend
     restart: unless-stopped
     # No external port - only accessible through nginx
     expose:
@@ -76,4 +76,7 @@ services:
 
 volumes:
   pocketbase_data:
+    # Fixed name from the TinyPlanvas days: keeps existing installations on
+    # their data no matter what the checkout directory is called.
+    name: tinyplanvas_pocketbase_data
     driver: local

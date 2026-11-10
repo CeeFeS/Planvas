@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 /**
- * TinyPlanvas - Harden collection ACL (server-side authorization)
+ * Planvas - Harden collection ACL (server-side authorization)
  *
  * Replaces the previous "any authenticated user" list/view/write rules with
  * ownership + project_permissions checks. Public share-link reads remain via

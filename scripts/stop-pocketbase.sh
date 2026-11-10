@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# TinyPlanvas - PocketBase Stop Script
+# Planvas - PocketBase Stop Script
 # =====================================
 
 set -e
@@ -10,7 +10,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_DIR"
 
-echo "🛑 Stopping TinyPlanvas PocketBase..."
+echo "🛑 Stopping Planvas PocketBase..."
 docker compose down
 
 echo ""
